@@ -1,7 +1,7 @@
 /* futari ふたり 💑 — 순수 JS (JSX/Babel 불필요) */
 (function () {
   'use strict';
-  var React = window.React, ReactDOM = window.ReactDOM, L = window.L;
+  var React = window.React, ReactDOM = window.ReactDOM;
   var useState = React.useState, useEffect = React.useEffect, useRef = React.useRef, useMemo = React.useMemo;
 
   // h(tag, props, ...children) — React.createElement 짧은 래퍼
@@ -41,6 +41,11 @@
   }
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
 
   /* ===== Supabase 공유 DB ===== */
   var ROOM_KEY = 'futari_room_code';
@@ -295,35 +300,58 @@
   /* ===== 지도 ===== */
   function MapPage(props) {
     var data = props.data, update = props.update;
-    var mapRef = useRef(null), mapObj = useRef(null), markers = useRef([]);
+    var mapRef = useRef(null), mapObj = useRef(null), markers = useRef([]), overlays = useRef([]);
     var pendingState = useState(null), pending = pendingState[0], setPending = pendingState[1];
     var nameState = useState(''), name = nameState[0], setName = nameState[1];
     var memoState = useState(''), memo = memoState[0], setMemo = memoState[1];
+    var readyState = useState(false), ready = readyState[0], setReady = readyState[1];
+    var errState = useState(''), mapErr = errState[0], setMapErr = errState[1];
 
+    // 카카오 SDK 로드 대기 → 지도 생성
     useEffect(function () {
-      if (mapObj.current || !mapRef.current || !L) return;
-      L.Icon.Default.mergeOptions({
-        iconUrl: 'vendor/images/marker-icon.png',
-        iconRetinaUrl: 'vendor/images/marker-icon-2x.png',
-        shadowUrl: 'vendor/images/marker-shadow.png'
-      });
-      var start = data.places[0] ? [data.places[0].lat, data.places[0].lng] : [37.5665, 126.9780];
-      var map = L.map(mapRef.current).setView(start, 12);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(map);
-      map.on('click', function (e) { setPending({ lat: e.latlng.lat, lng: e.latlng.lng }); });
-      mapObj.current = map;
+      var tries = 0;
+      function init() {
+        if (mapObj.current || !mapRef.current) return;
+        if (!window.kakao || !window.kakao.maps) {
+          tries++;
+          if (tries > 50) { setMapErr('지도를 불러오지 못했어요. (카카오 키/도메인 설정 확인)'); return; }
+          setTimeout(init, 100); return;
+        }
+        window.kakao.maps.load(function () {
+          if (mapObj.current || !mapRef.current) return;
+          var kakao = window.kakao;
+          var first = data.places[0];
+          var center = new kakao.maps.LatLng(first ? first.lat : 37.5665, first ? first.lng : 126.9780);
+          var map = new kakao.maps.Map(mapRef.current, { center: center, level: 6 });
+          kakao.maps.event.addListener(map, 'click', function (e) {
+            var ll = e.latLng;
+            setPending({ lat: ll.getLat(), lng: ll.getLng() });
+          });
+          mapObj.current = map;
+          setReady(true);
+        });
+      }
+      init();
     }, []);
 
+    // 마커 다시 그리기
     useEffect(function () {
-      if (!mapObj.current) return;
-      markers.current.forEach(function (m) { mapObj.current.removeLayer(m); });
-      markers.current = [];
+      if (!ready || !mapObj.current || !window.kakao) return;
+      var kakao = window.kakao;
+      markers.current.forEach(function (m) { m.setMap(null); });
+      overlays.current.forEach(function (o) { o.setMap(null); });
+      markers.current = []; overlays.current = [];
       data.places.forEach(function (p) {
-        var mk = L.marker([p.lat, p.lng]).addTo(mapObj.current);
-        mk.bindPopup('<b>' + p.name + '</b><br>' + (p.memo || ''));
+        var pos = new kakao.maps.LatLng(p.lat, p.lng);
+        var mk = new kakao.maps.Marker({ position: pos, map: mapObj.current });
+        var iw = new kakao.maps.InfoWindow({
+          content: '<div style="padding:6px 10px;font-size:13px;max-width:180px;"><b>' +
+            escapeHtml(p.name) + '</b>' + (p.memo ? '<br>' + escapeHtml(p.memo) : '') + '</div>'
+        });
+        kakao.maps.event.addListener(mk, 'click', function () { iw.open(mapObj.current, mk); });
         markers.current.push(mk);
       });
-    }, [data.places]);
+    }, [data.places, ready]);
 
     function savePlace() {
       if (!name.trim()) { alert('장소 이름을 입력해주세요.'); return; }
@@ -331,10 +359,18 @@
       setPending(null); setName(''); setMemo('');
     }
     function del(id) { if (confirm('이 장소를 삭제할까요?')) update(function (d) { d.places = d.places.filter(function (p) { return p.id !== id; }); }); }
+    function focusPlace(p) {
+      if (mapObj.current && window.kakao) {
+        mapObj.current.setCenter(new window.kakao.maps.LatLng(p.lat, p.lng));
+        mapObj.current.setLevel(3);
+        window.scrollTo(0, 0);
+      }
+    }
 
     return h('div', null,
       h('h2', { className: 'title-xl', style: { marginBottom: 10 } }, '🗺️ 함께 간 곳'),
       h('p', { className: 'muted', style: { marginBottom: 10 } }, '지도를 눌러 다녀온 장소를 추가하세요.'),
+      mapErr ? h('div', { className: 'card', style: { color: '#c0392b' } }, mapErr) : null,
       h('div', { id: 'map', ref: mapRef }),
       pending ? h(Modal, { onClose: function () { setPending(null); } },
         h('p', { className: 'title-lg' }, '📍 이곳을 추가'),
@@ -355,7 +391,7 @@
               h('div', { className: 't' }, '📍 ' + p.name),
               p.memo ? h('div', { className: 'm' }, p.memo) : null,
               h('div', { style: { textAlign: 'right' } },
-                h('span', { className: 'link', onClick: function () { mapObj.current.setView([p.lat, p.lng], 15); window.scrollTo(0, 0); } }, '지도에서 보기'),
+                h('span', { className: 'link', onClick: function () { focusPlace(p); } }, '지도에서 보기'),
                 h('span', null, '  '),
                 h('span', { className: 'link', onClick: function () { del(p.id); } }, '삭제')));
           }))
