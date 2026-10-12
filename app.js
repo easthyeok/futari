@@ -703,7 +703,7 @@
       h('div', { className: 'card' },
         h('p', { className: 'title-lg' }, '🔑 방 코드 입력'),
         h('p', { className: 'muted', style: { marginBottom: 10 } },
-          '두 사람이 같은 방 코드를 입력하면 같은 추억을 함께 봐요. 추측하기 어려운 코드를 정하세요. (예: donghyeok-love-1004)'),
+          '두 사람이 같은 방 코드를 입력하면 같은 추억을 함께 봐요. 추측하기 어려운 코드를 정하세요. (예: 서로만난날(261225))'),
         h('input', {
           placeholder: '우리 둘만의 방 코드', value: code,
           onChange: function (e) { setCode(e.target.value); },
