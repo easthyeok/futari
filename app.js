@@ -42,6 +42,41 @@
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
+  /* ===== Supabase 공유 DB ===== */
+  var ROOM_KEY = 'futari_room_code';
+  function getRoomCode() { try { return localStorage.getItem(ROOM_KEY) || ''; } catch (e) { return ''; } }
+  function setRoomCode(code) { try { if (code) localStorage.setItem(ROOM_KEY, code); else localStorage.removeItem(ROOM_KEY); } catch (e) {} }
+
+  var sb = null;
+  function getSupabase() {
+    if (sb) return sb;
+    var cfg = window.FUTARI_CONFIG;
+    if (!cfg || !window.supabase || !cfg.SUPABASE_URL) return null;
+    try { sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_KEY); return sb; }
+    catch (e) { console.warn('supabase init failed', e); return null; }
+  }
+
+  // 방 데이터 불러오기 (없으면 새로 만듦)
+  function cloudLoad(code) {
+    var client = getSupabase();
+    if (!client) return Promise.reject(new Error('Supabase 미설정'));
+    return client.from('rooms').select('data').eq('code', code).maybeSingle().then(function (res) {
+      if (res.error) throw res.error;
+      if (res.data && res.data.data) return res.data.data;
+      // 방이 없으면 빈 데이터로 생성
+      return client.from('rooms').insert({ code: code, data: freshData() }).then(function () { return freshData(); });
+    });
+  }
+  // 방 데이터 저장 (upsert)
+  function cloudSave(code, data) {
+    var client = getSupabase();
+    if (!client) return Promise.reject(new Error('Supabase 미설정'));
+    return client.from('rooms').upsert({ code: code, data: data, updated_at: new Date().toISOString() }).then(function (res) {
+      if (res.error) throw res.error;
+      return true;
+    });
+  }
+
   /* ===== 날짜 ===== */
   function todayStr() { return new Date().toISOString().slice(0, 10); }
   function daysBetween(a, b) {
@@ -610,16 +645,23 @@
             h('span', null, a.name + ' · ' + a.date),
             h('span', { className: 'link', onClick: function () { delAnn(a.id); } }, '삭제'));
         })) : null),
+      props.room ? h('div', { className: 'card' },
+        h('p', { className: 'title-lg' }, '🔑 우리 방'),
+        h('p', { className: 'muted', style: { marginBottom: 8 } }, '이 방 코드를 상대에게 알려주면 같은 데이터를 함께 봐요.'),
+        h('div', { style: { display: 'flex', gap: 8, alignItems: 'center' } },
+          h('input', { readOnly: true, value: props.room, style: { fontWeight: 700 } }),
+          h('button', { className: 'btn ghost sm', style: { flex: 'none' }, onClick: function () { navigator.clipboard && navigator.clipboard.writeText(props.room); alert('방 코드를 복사했어요!'); } }, '복사')),
+        h('button', { className: 'btn gray block sm', style: { marginTop: 10 }, onClick: props.leaveRoom }, '이 기기에서 방 나가기')) : null,
       h('div', { className: 'card' },
-        h('p', { className: 'title-lg' }, '💾 백업 (중요!)'),
-        h('p', { className: 'muted', style: { marginBottom: 10 } }, '데이터는 이 브라우저에만 저장돼요. PC를 바꾸거나 브라우저를 지우면 사라지니, 가끔 백업 파일을 저장해두세요.'),
+        h('p', { className: 'title-lg' }, '💾 백업'),
+        h('p', { className: 'muted', style: { marginBottom: 10 } }, '데이터는 클라우드(방 코드)에 저장돼요. 추가로 파일 백업도 받아둘 수 있어요.'),
         h('button', { className: 'btn block', onClick: exportData }, '📤 백업 내보내기 (파일 저장)'),
         h('button', { className: 'btn ghost block', style: { marginTop: 8 }, onClick: function () { fileRef.current.click(); } }, '📥 백업 가져오기 (복원)'),
         h('input', { ref: fileRef, type: 'file', accept: 'application/json', style: { display: 'none' }, onChange: importData })),
       h('div', { className: 'card' },
         h('p', { className: 'title-lg' }, '⚠️ 초기화'),
         h('button', { className: 'btn gray block', style: { color: '#c0392b' }, onClick: resetAll }, '모든 데이터 삭제')),
-      h('p', { className: 'muted center', style: { marginTop: 10 } }, 'futari ふたり 💑 v1')
+      h('p', { className: 'muted center', style: { marginTop: 10 } }, 'futari 💪 v1')
     );
   }
 
@@ -634,15 +676,117 @@
     { id: 'settings', ico: '⚙️', label: '설정', comp: SettingsPage }
   ];
 
+  /* ===== 방 코드 입력 화면 ===== */
+  function RoomGate(props) {
+    var codeState = useState(''), code = codeState[0], setCode = codeState[1];
+    var busyState = useState(false), busy = busyState[0], setBusy = busyState[1];
+    var errState = useState(''), err = errState[0], setErr = errState[1];
+
+    function enter() {
+      var c = code.trim();
+      if (c.length < 4) { setErr('방 코드는 4글자 이상으로 정해주세요.'); return; }
+      setBusy(true); setErr('');
+      cloudLoad(c).then(function (data) {
+        setRoomCode(c);
+        props.onEnter(c, data);
+      }).catch(function (e) {
+        console.error(e);
+        setErr('연결에 실패했어요. 잠시 후 다시 시도해주세요.');
+        setBusy(false);
+      });
+    }
+
+    return h('div', { className: 'app' },
+      h('div', { className: 'hero' },
+        h('div', { className: 'names' }, 'futari 💪'),
+        h('div', { className: 'sub', style: { marginTop: 8 } }, '둘만의 방 코드로 함께 기록해요')),
+      h('div', { className: 'card' },
+        h('p', { className: 'title-lg' }, '🔑 방 코드 입력'),
+        h('p', { className: 'muted', style: { marginBottom: 10 } },
+          '두 사람이 같은 방 코드를 입력하면 같은 추억을 함께 봐요. 추측하기 어려운 코드를 정하세요. (예: donghyeok-love-1004)'),
+        h('input', {
+          placeholder: '우리 둘만의 방 코드', value: code,
+          onChange: function (e) { setCode(e.target.value); },
+          onKeyDown: function (e) { if (e.key === 'Enter') enter(); }
+        }),
+        err ? h('p', { style: { color: '#c0392b', fontSize: 13, marginTop: 8 } }, err) : null,
+        h('button', { className: 'btn block', style: { marginTop: 12 }, disabled: busy, onClick: enter },
+          busy ? '연결 중…' : '입장하기')),
+      h('div', { className: 'card' },
+        h('p', { className: 'muted' }, '같은 코드를 쓰면 폰·PC 어디서 열어도 같은 데이터가 보여요. 코드는 이 기기에 기억돼서, 다음부턴 바로 들어와요.'))
+    );
+  }
+
   function App() {
-    var dataState = useState(loadData), data = dataState[0], setData = dataState[1];
+    var roomState = useState(getRoomCode()), room = roomState[0], setRoom = roomState[1];
+    var dataState = useState(null), data = dataState[0], setData = dataState[1];
     var tabState = useState('home'), tab = tabState[0], setTab = tabState[1];
-    useEffect(function () { saveData(data); }, [data]);
+    var loadingState = useState(!!getRoomCode()), loading = loadingState[0], setLoading = loadingState[1];
+    var syncState = useState(''), syncMsg = syncState[0], setSyncMsg = syncState[1];
+    var saveTimer = useRef(null);
+    var skipSave = useRef(true); // 최초 로드 직후 저장 방지
+
+    // 기존 방 코드가 있으면 자동으로 클라우드 로드
+    useEffect(function () {
+      if (!room) return;
+      cloudLoad(room).then(function (d) {
+        skipSave.current = true;
+        setData(d); setLoading(false);
+      }).catch(function (e) {
+        console.error(e);
+        setSyncMsg('연결 실패 — 방 코드를 다시 확인해주세요');
+        setLoading(false);
+      });
+    }, []);
+
+    // 데이터 변경 시 클라우드에 저장 (1.2초 디바운스)
+    useEffect(function () {
+      if (data == null) return;
+      if (skipSave.current) { skipSave.current = false; return; }
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      setSyncMsg('저장 중…');
+      saveTimer.current = setTimeout(function () {
+        cloudSave(room, data).then(function () { setSyncMsg('저장됨 ✓'); setTimeout(function () { setSyncMsg(''); }, 1500); })
+          .catch(function (e) { console.error(e); setSyncMsg('저장 실패'); });
+      }, 1200);
+    }, [data]);
+
+    // 상대방 변경사항 주기적으로 가져오기 (10초마다, 저장 중이 아닐 때)
+    useEffect(function () {
+      if (!room || data == null) return;
+      var iv = setInterval(function () {
+        cloudLoad(room).then(function (remote) {
+          var localStr = JSON.stringify(data), remoteStr = JSON.stringify(remote);
+          if (remoteStr !== localStr && !saveTimer.current) {
+            skipSave.current = true; setData(remote);
+          }
+        }).catch(function () {});
+      }, 10000);
+      return function () { clearInterval(iv); };
+    }, [room, data]);
+
     function update(mutator) { setData(function (prev) { var next = clone(prev); mutator(next); return next; }); }
-    var pageProps = { data: data, update: update, setData: setData };
+    function onEnter(code, loaded) { setRoom(code); skipSave.current = true; setData(loaded); setLoading(false); }
+    function leaveRoom() {
+      if (!confirm('이 기기에서 방을 나갈까요? (데이터는 클라우드에 남아있어요)')) return;
+      setRoomCode(''); setRoom(''); setData(null);
+    }
+
+    // 방 코드 없음 → 입력 화면
+    if (!room) return h(RoomGate, { onEnter: onEnter });
+    // 로딩 중
+    if (loading || data == null) {
+      return h('div', { className: 'app' },
+        h('div', { className: 'hero' }, h('div', { className: 'names' }, 'futari 💪'), h('div', { className: 'sub', style: { marginTop: 8 } }, '불러오는 중…')),
+        syncMsg ? h('div', { className: 'card' }, h('p', { className: 'muted center' }, syncMsg),
+          h('button', { className: 'btn ghost block', style: { marginTop: 8 }, onClick: leaveRoom }, '방 코드 다시 입력')) : null);
+    }
+
+    var pageProps = { data: data, update: update, setData: setData, room: room, leaveRoom: leaveRoom };
     var current = TABS.find(function (t) { return t.id === tab; });
 
     return h('div', { className: 'app' },
+      syncMsg ? h('div', { style: { position: 'fixed', top: 8, left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,.65)', color: '#fff', padding: '4px 12px', borderRadius: 999, fontSize: 12, zIndex: 3000 } }, syncMsg) : null,
       h(current.comp, pageProps),
       h('nav', { className: 'tabbar' }, TABS.map(function (t) {
         return h('button', { key: t.id, className: 'tab' + (tab === t.id ? ' active' : ''), onClick: function () { setTab(t.id); window.scrollTo(0, 0); } },
