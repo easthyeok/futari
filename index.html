@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>futari ふたり 💑</title>
+
+  <!-- Leaflet 지도 (로컬) -->
+  <link rel="stylesheet" href="vendor/leaflet.css" />
+  <script src="vendor/leaflet.js"></script>
+
+  <!-- React (로컬) — Babel 불필요: 순수 JS로 작성 -->
+  <script src="vendor/react.js"></script>
+  <script src="vendor/react-dom.js"></script>
+
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+      background: linear-gradient(160deg, #fff1f5 0%, #ffe8ef 40%, #fde7f3 100%);
+      color: #3a2b33;
+      min-height: 100vh;
+    }
+    #root { max-width: 480px; margin: 0 auto; min-height: 100vh; position: relative; }
+    .app { padding: 16px 16px 92px; }
+    .card { background: rgba(255,255,255,0.85); border: 1px solid rgba(255,180,205,0.5); border-radius: 18px; padding: 16px; margin-bottom: 14px; box-shadow: 0 6px 20px rgba(255,150,185,0.12); }
+    .title-xl { font-size: 22px; font-weight: 800; margin: 0; }
+    .title-lg { font-size: 18px; font-weight: 700; margin: 0 0 10px; }
+    .muted { color: #a07f8e; font-size: 13px; }
+    .center { text-align: center; }
+    .btn { border: none; cursor: pointer; border-radius: 12px; padding: 11px 14px; font-size: 15px; font-weight: 600; background: #ff5d8f; color: #fff; }
+    .btn:active { transform: scale(0.97); }
+    .btn.ghost { background: #ffe1ea; color: #d83c6b; }
+    .btn.gray { background: #efe7eb; color: #6b5560; }
+    .btn.sm { padding: 7px 11px; font-size: 13px; border-radius: 10px; }
+    .btn.block { width: 100%; }
+    input, textarea, select { width: 100%; border: 1px solid #f3c6d6; border-radius: 11px; padding: 10px 12px; font-size: 15px; background: #fff; color: #3a2b33; outline: none; font-family: inherit; }
+    input:focus, textarea:focus, select:focus { border-color: #ff8fb3; }
+    label { font-size: 13px; font-weight: 600; color: #8a6b78; display: block; margin: 10px 0 5px; }
+    textarea { resize: vertical; min-height: 60px; }
+    .row { display: flex; gap: 8px; }
+    .row > * { flex: 1; }
+    .hero { text-align: center; padding: 22px 16px 18px; background: linear-gradient(135deg, #ff7aa2, #ff5d8f); color: #fff; border-radius: 0 0 26px 26px; margin: -16px -16px 16px; box-shadow: 0 8px 22px rgba(255,93,143,0.3); }
+    .hero .names { font-size: 20px; font-weight: 800; }
+    .hero .dday { font-size: 40px; font-weight: 900; letter-spacing: -1px; margin: 6px 0 2px; }
+    .hero .sub { font-size: 13px; opacity: .92; }
+    .tabbar { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; display: flex; background: rgba(255,255,255,0.96); border-top: 1px solid #ffd6e3; padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); z-index: 1000; }
+    .tab { flex: 1; border: none; background: none; cursor: pointer; padding: 6px 2px; font-size: 10px; color: #b78a9a; font-weight: 600; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .tab .ico { font-size: 20px; }
+    .tab.active { color: #ff3d7f; }
+    .pill { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+    .pill.pink { background: #ffe1ea; color: #d83c6b; }
+    .pill.gray { background: #eee; color: #888; }
+    .item { background: #fff; border: 1px solid #ffe0ea; border-radius: 14px; padding: 12px; margin-bottom: 10px; }
+    .item .when { font-size: 12px; color: #c08; font-weight: 700; }
+    .item .t { font-size: 15px; font-weight: 700; margin: 3px 0; }
+    .item .m { font-size: 13px; color: #6b5560; white-space: pre-wrap; }
+    .thumb { width: 100%; border-radius: 10px; margin-top: 8px; display: block; }
+    .empty { text-align: center; color: #c3a3b0; padding: 24px 10px; font-size: 14px; }
+    .timeline-line { position: relative; padding-left: 20px; }
+    .timeline-line::before { content: ''; position: absolute; left: 6px; top: 4px; bottom: 4px; width: 2px; background: linear-gradient(#ff9fbd, #ffd0de); }
+    .dot { position: absolute; left: 0; width: 14px; height: 14px; border-radius: 50%; background: #ff5d8f; border: 3px solid #fff; box-shadow: 0 0 0 1px #ffb3cb; }
+    .seg { display: flex; gap: 6px; background: #ffe1ea; padding: 4px; border-radius: 12px; margin-bottom: 12px; }
+    .seg button { flex: 1; border: none; background: none; padding: 8px; border-radius: 9px; font-weight: 700; font-size: 13px; color: #c17; cursor: pointer; }
+    .seg button.on { background: #fff; color: #ff3d7f; }
+    .badge-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .badge { text-align: center; font-size: 11px; }
+    .badge .b-ico { font-size: 26px; filter: grayscale(1); opacity: .3; }
+    .badge.got .b-ico { filter: none; opacity: 1; }
+    .bar { height: 10px; background: #ffe1ea; border-radius: 999px; overflow: hidden; }
+    .bar > div { height: 100%; background: linear-gradient(90deg,#ff8fb3,#ff3d7f); border-radius: 999px; }
+    #map { height: 300px; border-radius: 14px; overflow: hidden; }
+    .mood-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+    .mood { font-size: 26px; background: #fff; border: 1px solid #ffe0ea; border-radius: 12px; padding: 8px 0; cursor: pointer; }
+    .mood.on { background: #ffe1ea; border-color: #ff8fb3; }
+    .q-card { background: linear-gradient(135deg,#ffd3e2,#ffc0d6); border-radius: 18px; padding: 22px 18px; text-align: center; font-size: 17px; font-weight: 700; color: #a6265a; min-height: 90px; display: flex; align-items: center; justify-content: center; }
+    .link { color: #d83c6b; text-decoration: underline; cursor: pointer; font-size: 13px; }
+    .modal-bg { position: fixed; inset: 0; background: rgba(60,30,45,.45); z-index: 2000; display: flex; align-items: flex-end; justify-content: center; }
+    .modal-box { background: #fff; width: 100%; max-width: 480px; border-radius: 22px 22px 0 0; padding: 18px; max-height: 85vh; overflow-y: auto; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="app.js"></script>
+</body>
+</html>
