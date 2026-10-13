@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>futari 💪</title>
 
   <!-- React (로컬) — Babel 불필요: 순수 JS로 작성 -->
@@ -90,6 +90,19 @@
     .link { color: #d83c6b; text-decoration: underline; cursor: pointer; font-size: 13px; }
     .modal-bg { position: fixed; inset: 0; background: rgba(60,30,45,.45); z-index: 2000; display: flex; align-items: flex-end; justify-content: center; }
     .modal-box { background: #fff; width: 100%; max-width: 480px; border-radius: 22px 22px 0 0; padding: 18px; max-height: 85vh; overflow-y: auto; }
+    .photo-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 10px 0; }
+    .photo-grid:empty { display: none; }
+    .photo-button { border: 0; padding: 0; background: #ffe1ea; border-radius: 12px; overflow: hidden; cursor: pointer; }
+    .photo-button img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; }
+    .viewer-image { width: 100%; max-height: 60vh; object-fit: contain; display: block; }
+    .calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin: 16px 0; }
+    .calendar-day { min-height: 44px; border: 1px solid transparent; border-radius: 10px; background: #fff; color: #3a2b33; cursor: pointer; font: inherit; }
+    .calendar-day.today { border-color: #ff8fb3; }
+    .calendar-day.selected { background: #ff5d8f; color: white; }
+    .event-dot { display: block; height: 10px; font-size: 8px; }
+    button:disabled { opacity: .45; cursor: default; }
+    button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid #b12c62; outline-offset: 2px; }
+    .row > * { min-width: 0; }
   </style>
 </head>
 <body>

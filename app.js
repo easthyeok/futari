@@ -69,7 +69,7 @@
       if (res.error) throw res.error;
       if (res.data && res.data.data) return res.data.data;
       // 방이 없으면 빈 데이터로 생성
-      return client.from('rooms').insert({ code: code, data: freshData() }).then(function () { return freshData(); });
+      return client.from('rooms').insert({ code: code, data: freshData() }).then(function (created) { if (created.error) throw created.error; return freshData(); });
     });
   }
   // 방 데이터 저장 (upsert)
@@ -83,7 +83,7 @@
   }
 
   /* ===== 날짜 ===== */
-  function todayStr() { return new Date().toISOString().slice(0, 10); }
+  function todayStr() { return localDate(new Date()); }
   function daysBetween(a, b) {
     var d1 = new Date(a + 'T00:00:00'), d2 = new Date(b + 'T00:00:00');
     return Math.round((d2 - d1) / 86400000);
@@ -123,27 +123,6 @@
   }
 
   /* 사진 리사이즈 → base64 */
-  function fileToResizedDataURL(file, maxSize, quality) {
-    maxSize = maxSize || 900; quality = quality || 0.72;
-    return new Promise(function (resolve, reject) {
-      var reader = new FileReader();
-      reader.onload = function (e) {
-        var img = new Image();
-        img.onload = function () {
-          var w = img.width, hh = img.height;
-          if (w > hh && w > maxSize) { hh = hh * maxSize / w; w = maxSize; }
-          else if (hh > maxSize) { w = w * maxSize / hh; hh = maxSize; }
-          var canvas = document.createElement('canvas');
-          canvas.width = w; canvas.height = hh;
-          canvas.getContext('2d').drawImage(img, 0, 0, w, hh);
-          resolve(canvas.toDataURL('image/jpeg', quality));
-        };
-        img.onerror = reject; img.src = e.target.result;
-      };
-      reader.onerror = reject; reader.readAsDataURL(file);
-    });
-  }
-
   /* ===== 상수 ===== */
   var QUESTIONS = [
     '처음 만났을 때 서로의 첫인상은?', '올해 꼭 같이 가보고 싶은 곳은?', '상대의 가장 사랑스러운 순간은 언제였어?',
@@ -243,58 +222,80 @@
   }
 
   /* ===== 추억 ===== */
+  function localDate(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function memoryPhotos(m) { return Array.isArray(m.photos) ? m.photos : (m.photo && m.photo !== '…' ? [m.photo] : []); }
   function TimelinePage(props) {
     var data = props.data, update = props.update;
-    var openState = useState(false), open = openState[0], setOpen = openState[1];
-    var formState = useState({ date: todayStr(), title: '', memo: '', photo: '' }), form = formState[0], setForm = formState[1];
-    var sorted = data.memories.slice().sort(function (a, b) { return b.date > a.date ? 1 : -1; });
-
-    function onPhoto(e) {
-      var f = e.target.files[0]; if (!f) return;
-      setForm(Object.assign({}, form, { photo: '…' }));
-      fileToResizedDataURL(f).then(function (url) {
-        setForm(function (fm) { return Object.assign({}, fm, { photo: url }); });
-      }).catch(function () { alert('사진을 불러오지 못했어요.'); setForm(function (fm) { return Object.assign({}, fm, { photo: '' }); }); });
+    var editor = useState(null), form = editor[0], setForm = editor[1];
+    var qs = useState(''), query = qs[0], setQuery = qs[1];
+    var ms = useState(''), month = ms[0], setMonth = ms[1];
+    var vs = useState(null), viewing = vs[0], setViewing = vs[1];
+    function close() { setForm(null); }
+    function edit(m) { setForm(m ? Object.assign({}, m) : { date: todayStr(), title: '', memo: '' }); }
+    function field(key, value) { setForm(function (f) { var next = Object.assign({}, f); next[key] = value; return next; }); }
+    function save() {
+      if (!form.title.trim() || !form.date) return;
+      var saved = Object.assign({}, form, { id: form.id || uid(), title: form.title.trim() });
+      update(function (d) { var i = d.memories.findIndex(function (m) { return m.id === saved.id; }); if (i < 0) d.memories.push(saved); else d.memories[i] = saved; }); close();
     }
-    function add() {
-      if (!form.title.trim()) { alert('제목을 입력해주세요.'); return; }
-      update(function (d) { d.memories.push(Object.assign({ id: uid() }, form)); });
-      setForm({ date: todayStr(), title: '', memo: '', photo: '' }); setOpen(false);
-    }
-    function del(id) { if (confirm('이 추억을 삭제할까요?')) update(function (d) { d.memories = d.memories.filter(function (m) { return m.id !== id; }); }); }
-
+    var sorted = data.memories.filter(function (m) {
+      return (!month || m.date.slice(0, 7) === month) && (m.title + ' ' + (m.memo || '')).toLowerCase().includes(query.trim().toLowerCase());
+    }).sort(function (a, b) { return b.date.localeCompare(a.date); });
     return h('div', null,
-      h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 } },
-        h('h2', { className: 'title-xl' }, '📖 우리의 추억'),
-        h('button', { className: 'btn sm', onClick: function () { setOpen(true); } }, '+ 추억 추가')),
-      sorted.length === 0
-        ? h('div', { className: 'empty' }, '첫 추억을 기록해보세요 💕')
-        : h('div', { className: 'timeline-line' }, sorted.map(function (m) {
-          return h('div', { key: m.id, className: 'item', style: { position: 'relative' } },
-            h('span', { className: 'dot', style: { top: 14 } }),
-            h('div', { className: 'when' }, fmtK(m.date)),
-            h('div', { className: 't' }, m.title),
-            (m.photo && m.photo !== '…') ? h('img', { className: 'thumb', src: m.photo, alt: '' }) : null,
-            m.memo ? h('div', { className: 'm' }, m.memo) : null,
-            h('div', { style: { textAlign: 'right', marginTop: 6 } }, h('span', { className: 'link', onClick: function () { del(m.id); } }, '삭제')));
-        })),
-      open ? h(Modal, { onClose: function () { setOpen(false); } },
-        h('p', { className: 'title-lg' }, '추억 추가'),
-        h('label', null, '날짜'),
-        h('input', { type: 'date', value: form.date, onChange: function (e) { setForm(Object.assign({}, form, { date: e.target.value })); } }),
-        h('label', null, '제목'),
-        h('input', { placeholder: '예: 첫 데이트 🎀', value: form.title, onChange: function (e) { setForm(Object.assign({}, form, { title: e.target.value })); } }),
-        h('label', null, '메모'),
-        h('textarea', { placeholder: '그날의 이야기를 적어보세요', value: form.memo, onChange: function (e) { setForm(Object.assign({}, form, { memo: e.target.value })); } }),
-        h('label', null, '사진'),
-        h('input', { type: 'file', accept: 'image/*', onChange: onPhoto }),
-        (form.photo && form.photo !== '…') ? h('img', { className: 'thumb', src: form.photo, alt: '' }) : null,
-        form.photo === '…' ? h('p', { className: 'muted' }, '사진 처리 중…') : null,
-        h('div', { className: 'row', style: { marginTop: 14 } },
-          h('button', { className: 'btn gray', onClick: function () { setOpen(false); } }, '취소'),
-          h('button', { className: 'btn', onClick: add }, '저장'))
-      ) : null
-    );
+      h('div', { className: 'row', style: { alignItems: 'center', marginBottom: 12 } }, h('h2', { className: 'title-xl' }, '📖 우리의 추억'), h('button', { className: 'btn sm', onClick: function () { edit(null); } }, '+ 추억 추가')),
+      h('div', { className: 'card' }, h('input', { type: 'search', 'aria-label': '추억 검색', placeholder: '제목이나 메모로 검색', value: query, onChange: function (e) { setQuery(e.target.value); } }),
+        h('label', null, '월별 보기'), h('div', { className: 'row' }, h('input', { type: 'month', 'aria-label': '추억 월', value: month, onChange: function (e) { setMonth(e.target.value); } }), h('button', { className: 'btn ghost sm', onClick: function () { setMonth(''); setQuery(''); } }, '전체 보기')),
+        h('p', { className: 'muted' }, sorted.length + '개의 추억')),
+      !sorted.length ? h('div', { className: 'empty' }, data.memories.length ? '검색 결과가 없어요.' : '첫 추억을 기록해보세요 💕') : sorted.map(function (m) {
+        return h('article', { key: m.id, className: 'item' }, h('div', { className: 'when' }, fmtK(m.date)), h('h3', { className: 't' }, m.title),
+          h('div', { className: 'photo-grid' }, memoryPhotos(m).map(function (url, i) { return h('button', { key: i, className: 'photo-button', 'aria-label': m.title + ' 사진 ' + (i + 1) + ' 크게 보기', onClick: function () { setViewing({ photos: memoryPhotos(m), index: i }); } }, h('img', { src: url, alt: m.title + ' 사진 ' + (i + 1), loading: 'lazy' })); })),
+          h('div', { className: 'm' }, m.memo), h('div', { className: 'row', style: { marginTop: 12 } },
+            h('button', { className: 'btn ghost sm', onClick: function () { edit(m); } }, '수정'),
+            h('button', { className: 'btn gray sm', onClick: function () { if (confirm('이 추억을 삭제할까요?')) update(function (d) { d.memories = d.memories.filter(function (x) { return x.id !== m.id; }); }); } }, '삭제')));
+      }),
+      form ? h(Modal, { onClose: close }, h('h2', { className: 'title-lg' }, form.id ? '추억 수정' : '추억 추가'),
+        h('label', null, '날짜'), h('input', { type: 'date', value: form.date, onChange: function (e) { field('date', e.target.value); } }),
+        h('label', null, '제목'), h('input', { value: form.title, placeholder: '어떤 추억인가요?', onChange: function (e) { field('title', e.target.value); } }),
+        h('label', null, '메모'), h('textarea', { value: form.memo, onChange: function (e) { field('memo', e.target.value); } }),
+        h('div', { className: 'row', style: { marginTop: 14 } }, h('button', { className: 'btn gray', onClick: close }, '취소'), h('button', { className: 'btn', disabled: !form.title.trim() || !form.date, onClick: save }, '저장'))) : null,
+      viewing ? h(Modal, { onClose: function () { setViewing(null); } }, h('img', { className: 'viewer-image', src: viewing.photos[viewing.index], alt: '추억 사진 ' + (viewing.index + 1) }),
+        h('p', { className: 'center muted' }, (viewing.index + 1) + ' / ' + viewing.photos.length),
+        h('div', { className: 'row' }, h('button', { className: 'btn ghost', disabled: viewing.index === 0, onClick: function () { setViewing(Object.assign({}, viewing, { index: viewing.index - 1 })); } }, '이전'), h('button', { className: 'btn gray', onClick: function () { setViewing(null); } }, '닫기'), h('button', { className: 'btn ghost', disabled: viewing.index === viewing.photos.length - 1, onClick: function () { setViewing(Object.assign({}, viewing, { index: viewing.index + 1 })); } }, '다음'))) : null);
+  }
+
+  function CoupleCalendar(props) {
+    var state = useState(todayStr().slice(0, 7)), month = state[0], setMonth = state[1];
+    var ss = useState(todayStr()), selected = ss[0], setSelected = ss[1];
+    var parts = month.split('-').map(Number), year = parts[0], mo = parts[1] - 1;
+    var start = new Date(year, mo, 1).getDay(), count = new Date(year, mo + 1, 0).getDate();
+    var events = props.data.dates.map(function (x) { return { date: x.date, title: '📅 ' + x.title }; }).concat(props.data.memories.map(function (x) { return { date: x.date, title: '📖 ' + x.title }; }));
+    props.data.settings.anniversaries.forEach(function (x) { events.push({ date: year + x.date.slice(4), title: '🎉 ' + x.name }); });
+    if (props.data.settings.startDate) events.push({ date: year + props.data.settings.startDate.slice(4), title: '💕 만난 날' });
+    function move(offset) { var d = new Date(year, mo + offset, 1); setMonth(localDate(d).slice(0, 7)); setSelected(localDate(d)); }
+    var cells = Array.from({ length: start }, function (_, i) { return h('span', { key: 'blank' + i }); });
+    for (var day = 1; day <= count; day++) {
+      (function (date, number) {
+        var has = events.some(function (x) { return x.date === date; });
+        cells.push(h('button', { key: date, className: 'calendar-day' + (selected === date ? ' selected' : '') + (date === todayStr() ? ' today' : ''), 'aria-label': date + (has ? ' 기록 있음' : ''), 'aria-pressed': selected === date, onClick: function () { setSelected(date); } }, number, h('span', { className: 'event-dot' }, has ? '●' : '')));
+      })(localDate(new Date(year, mo, day)), day);
+    }
+    var daily = events.filter(function (x) { return x.date === selected; });
+    return h('section', { className: 'card' }, h('div', { className: 'row', style: { alignItems: 'center' } }, h('button', { className: 'btn ghost sm', 'aria-label': '이전 달', onClick: function () { move(-1); } }, '‹'), h('strong', { className: 'center' }, year + '년 ' + (mo + 1) + '월'), h('button', { className: 'btn ghost sm', 'aria-label': '다음 달', onClick: function () { move(1); } }, '›')),
+      h('div', { className: 'calendar-grid' }, ['일', '월', '화', '수', '목', '금', '토'].map(function (x) { return h('span', { key: x, className: 'center muted' }, x); }), cells),
+      h('p', { className: 'when' }, fmtK(selected)), daily.length ? daily.map(function (x, i) { return h('p', { key: i, className: 'm' }, x.title); }) : h('p', { className: 'muted' }, '이날은 아직 기록이 없어요.'),
+      h('button', { className: 'btn ghost block', onClick: function () { props.onAdd(selected); } }, '+ 이 날짜에 약속 추가'));
+  }
+
+  function DateRoulette(props) {
+    var rs = useState(''), result = rs[0], setResult = rs[1];
+    var cs = useState('전체'), category = cs[0], setCategory = cs[1];
+    var pending = props.data.buckets.filter(function (b) { return !b.done; });
+    var categories = ['전체'].concat(Array.from(new Set(pending.map(function (b) { return b.category; }).filter(Boolean))));
+    var choices = pending.filter(function (b) { return category === '전체' || b.category === category; });
+    return h('section', { className: 'card' }, h('h2', { className: 'title-lg' }, '🎲 오늘 뭐 할까?'), h('p', { className: 'muted' }, '아직 이루지 않은 버킷리스트에서 골라드려요.'),
+      h('select', { 'aria-label': '룰렛 카테고리', value: category, onChange: function (e) { setCategory(e.target.value); setResult(''); } }, categories.map(function (x) { return h('option', { key: x, value: x }, x); })),
+      h('p', { className: 'q-card', role: 'status', 'aria-live': 'polite' }, result || (choices.length ? '두근두근, 오늘의 데이트는?' : '버킷 탭에 하고 싶은 일을 추가해보세요.')),
+      h('button', { className: 'btn block', disabled: !choices.length, onClick: function () { var pool = choices.filter(function (b) { return b.text !== result; }); if (!pool.length) pool = choices; setResult(pool[Math.floor(Math.random() * pool.length)].text); } }, result ? '다시 뽑기' : '데이트 뽑기'));
   }
 
   /* ===== 지도 ===== */
@@ -488,8 +489,9 @@
 
     return h('div', null,
       h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 } },
-        h('h2', { className: 'title-xl' }, '📅 데이트 약속'),
+        h('h2', { className: 'title-xl' }, '📅 커플 캘린더'),
         h('button', { className: 'btn sm', onClick: function () { setOpen(true); } }, '+ 추가')),
+      h(CoupleCalendar, { data: data, onAdd: function (date) { setForm({ date: date, title: '', memo: '' }); setOpen(true); } }),
       h('div', { className: 'seg' },
         h('button', { className: tab === 'up' ? 'on' : '', onClick: function () { setTab('up'); } }, '예정 (' + upcoming.length + ')'),
         h('button', { className: tab === 'done' ? 'on' : '', onClick: function () { setTab('done'); } }, '완료 (' + doneList.length + ')')),
@@ -610,6 +612,7 @@
 
     return h('div', null,
       h('h2', { className: 'title-xl', style: { marginBottom: 10 } }, '🎲 둘이 놀기'),
+      h(DateRoulette, { data: data }),
       h('div', { className: 'seg' },
         h('button', { className: tab === 'q' ? 'on' : '', onClick: function () { setTab('q'); } }, '질문카드'),
         h('button', { className: tab === 'mood' ? 'on' : '', onClick: function () { setTab('mood'); } }, '오늘 기분'),
@@ -707,7 +710,7 @@
     { id: 'memory', ico: '📖', label: '추억', comp: TimelinePage },
     { id: 'map', ico: '🗺️', label: '지도', comp: MapPage },
     { id: 'bucket', ico: '⭐', label: '버킷', comp: BucketPage },
-    { id: 'date', ico: '📅', label: '약속', comp: DatePlanPage },
+    { id: 'date', ico: '📅', label: '달력', comp: DatePlanPage },
     { id: 'play', ico: '🎲', label: '놀이', comp: PlayPage },
     { id: 'settings', ico: '⚙️', label: '설정', comp: SettingsPage }
   ];
@@ -760,6 +763,8 @@
     var loadingState = useState(!!getRoomCode()), loading = loadingState[0], setLoading = loadingState[1];
     var syncState = useState(''), syncMsg = syncState[0], setSyncMsg = syncState[1];
     var saveTimer = useRef(null);
+    var dirty = useRef(false), revision = useRef(0), saveQueue = useRef(Promise.resolve());
+    var retryState = useState(0), retry = retryState[0], setRetry = retryState[1];
     var skipSave = useRef(true); // 최초 로드 직후 저장 방지
 
     // 기존 방 코드가 있으면 자동으로 클라우드 로드
@@ -775,36 +780,49 @@
       });
     }, []);
 
-    // 데이터 변경 시 클라우드에 저장 (1.2초 디바운스)
+    // 저장을 순서대로 처리하고 실패한 변경은 원격 조회로 덮어쓰지 않는다.
     useEffect(function () {
-      if (data == null) return;
+      if (data == null || !room) return;
       if (skipSave.current) { skipSave.current = false; return; }
-      if (saveTimer.current) clearTimeout(saveTimer.current);
+      dirty.current = true;
+      var version = ++revision.current, cancelled = false;
       setSyncMsg('저장 중…');
       saveTimer.current = setTimeout(function () {
-        cloudSave(room, data).then(function () { setSyncMsg('저장됨 ✓'); setTimeout(function () { setSyncMsg(''); }, 1500); })
-          .catch(function (e) { console.error(e); setSyncMsg('저장 실패'); });
+        saveTimer.current = null;
+        saveQueue.current = saveQueue.current.catch(function () {}).then(function () {
+          if (cancelled) return;
+          return cloudSave(room, data).then(function () {
+            if (cancelled || version !== revision.current) return;
+            dirty.current = false; setSyncMsg('저장됨 ✓');
+          }).catch(function (e) {
+            console.error(e);
+            if (!cancelled && version === revision.current) setSyncMsg('저장 실패 · 눌러서 다시 시도');
+          });
+        });
       }, 1200);
-    }, [data]);
+      return function () { cancelled = true; if (saveTimer.current) clearTimeout(saveTimer.current); saveTimer.current = null; };
+    }, [data, room, retry]);
 
-    // 상대방 변경사항 주기적으로 가져오기 (10초마다, 저장 중이 아닐 때)
     useEffect(function () {
       if (!room || data == null) return;
+      var active = true;
       var iv = setInterval(function () {
+        if (dirty.current) return;
+        var version = revision.current;
         cloudLoad(room).then(function (remote) {
-          var localStr = JSON.stringify(data), remoteStr = JSON.stringify(remote);
-          if (remoteStr !== localStr && !saveTimer.current) {
+          if (active && !dirty.current && version === revision.current && JSON.stringify(remote) !== JSON.stringify(data)) {
             skipSave.current = true; setData(remote);
           }
         }).catch(function () {});
       }, 10000);
-      return function () { clearInterval(iv); };
+      return function () { active = false; clearInterval(iv); };
     }, [room, data]);
 
-    function update(mutator) { setData(function (prev) { var next = clone(prev); mutator(next); return next; }); }
-    function onEnter(code, loaded) { setRoom(code); skipSave.current = true; setData(loaded); setLoading(false); }
+    function update(mutator) { dirty.current = true; revision.current++; setData(function (prev) { var next = clone(prev); mutator(next); return next; }); }
+    function onEnter(code, loaded) { dirty.current = false; setSyncMsg(''); setRoom(code); skipSave.current = true; setData(loaded); setLoading(false); }
     function leaveRoom() {
-      if (!confirm('이 기기에서 방을 나갈까요? (데이터는 클라우드에 남아있어요)')) return;
+      if (!confirm(dirty.current ? '아직 저장하지 못한 변경이 있어요. 그래도 방을 나갈까요?' : '이 기기에서 방을 나갈까요? (데이터는 클라우드에 남아있어요)')) return;
+      dirty.current = false; revision.current++;
       setRoomCode(''); setRoom(''); setData(null);
     }
 
@@ -822,7 +840,7 @@
     var current = TABS.find(function (t) { return t.id === tab; });
 
     return h('div', { className: 'app' },
-      syncMsg ? h('div', { style: { position: 'fixed', top: 8, left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,.65)', color: '#fff', padding: '4px 12px', borderRadius: 999, fontSize: 12, zIndex: 3000 } }, syncMsg) : null,
+      syncMsg ? h('button', { type: 'button', onClick: function () { if (syncMsg.indexOf('저장 실패') === 0) setRetry(function (n) { return n + 1; }); }, style: { border: 0, cursor: 'pointer', position: 'fixed', top: 8, left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,.65)', color: '#fff', padding: '4px 12px', borderRadius: 999, fontSize: 12, zIndex: 3000 } }, syncMsg) : null,
       h(current.comp, pageProps),
       h('nav', { className: 'tabbar' }, TABS.map(function (t) {
         return h('button', { key: t.id, className: 'tab' + (tab === t.id ? ' active' : ''), onClick: function () { setTab(t.id); window.scrollTo(0, 0); } },
