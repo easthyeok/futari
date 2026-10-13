@@ -13,18 +13,6 @@
   <script src="vendor/supabase.js"></script>
   <script src="config.js"></script>
 
-  <!-- 카카오맵 SDK (config.js의 키로 동적 로드) -->
-  <script>
-    (function () {
-      var key = (window.FUTARI_CONFIG && window.FUTARI_CONFIG.KAKAO_MAP_KEY) || '';
-      if (!key) return;
-      var s = document.createElement('script');
-      s.src = 'https://dapi.kakao.com/v2/maps/sdk.js?appkey=' + key + '&autoload=false';
-      s.async = false;
-      document.head.appendChild(s);
-    })();
-  </script>
-
   <style>
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body { margin: 0; padding: 0; }
@@ -82,7 +70,6 @@
     .badge.got .b-ico { filter: none; opacity: 1; }
     .bar { height: 10px; background: #ffe1ea; border-radius: 999px; overflow: hidden; }
     .bar > div { height: 100%; background: linear-gradient(90deg,#ff8fb3,#ff3d7f); border-radius: 999px; }
-    #map { height: 300px; border-radius: 14px; overflow: hidden; }
     .mood-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
     .mood { font-size: 26px; background: #fff; border: 1px solid #ffe0ea; border-radius: 12px; padding: 8px 0; cursor: pointer; }
     .mood.on { background: #ffe1ea; border-color: #ff8fb3; }
@@ -103,10 +90,41 @@
     button:disabled { opacity: .45; cursor: default; }
     button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid #b12c62; outline-offset: 2px; }
     .row > * { min-width: 0; }
+    .game-score { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px; padding: 12px 14px; margin: 14px 0; background: #fff; border: 1px solid #f3c6d6; border-radius: 14px; font-size: 13px; }
+    .game-score strong { color: #ad2656; overflow-wrap: anywhere; }
+    .game-table { background: linear-gradient(145deg, #fffaf3, #fff0f4); }
+    .game-status { text-align: center; font-size: 21px; font-weight: 800; padding: 8px; overflow-wrap: anywhere; }
+    .player-legend { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin: 8px 0 16px; }
+    .player-tag { padding: 7px 12px; border-radius: 999px; font-size: 13px; border: 2px solid transparent; overflow-wrap: anywhere; }
+    .player-0 { color: #a72852; background: #ffdae5; }
+    .player-1 { color: #205770; background: #d6edf7; }
+    .player-tag.current { border-color: currentColor; font-weight: 800; }
+    .four-drops, .four-board { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; padding: 10px; }
+    .four-drops { padding-bottom: 6px; }
+    .drop-button { min-height: 44px; padding: 0; border: 0; border-radius: 10px; background: #f7dfcb; color: #72442b; font-size: 24px; cursor: pointer; }
+    .four-board { background: #8e6350; border: 4px solid #74503e; border-radius: 18px; box-shadow: inset 0 3px 8px #583c3044, 0 6px 0 #d7b9a1; }
+    .four-cell { display: flex; align-items: center; justify-content: center; aspect-ratio: 1; border-radius: 50%; background: #fffbf5; box-shadow: inset 0 2px 4px #583c3044; font-size: clamp(15px, 4vw, 23px); }
+    .token-0 { background: #ec6688; color: #fff; }
+    .token-1 { background: #3485a8; color: #fff; }
+    .four-cell.winning { outline: 3px solid #ffe680; outline-offset: -3px; box-shadow: 0 0 10px #ffe680; }
+    .race-board { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; padding: 8px; background: #e8d5c0; border: 3px solid #c4a581; border-radius: 16px; }
+    .race-cell { min-height: 74px; padding: 5px 2px; border-radius: 8px; background: #fffaf0; display: flex; align-items: center; flex-direction: column; gap: 3px; }
+    .race-cell.jump { background: #e2eff0; }
+    .race-cell.finish { background: #fff0a6; }
+    .tile-number { font-size: 12px; font-weight: 800; }
+    .tile-event { font-size: 11px; min-height: 14px; color: #53666a; }
+    .race-tokens { display: flex; gap: 2px; min-height: 22px; }
+    .race-token { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; font-size: 12px; }
+    .race-message { padding: 12px; background: #fff; border-radius: 12px; font-size: 14px; line-height: 1.6; min-height: 68px; }
+    .dice-button { min-height: 52px; }
+    .couple-card { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 240px; margin: 18px 0; padding: 28px 22px; border: 2px solid #f4b6c9; border-radius: 20px; background: linear-gradient(145deg, #fff8eb, #ffe4ef); box-shadow: 5px 5px 0 #f7d4df; text-align: center; }
+    .couple-card p { font-size: 19px; font-weight: 700; line-height: 1.7; }
+    @media (max-width: 360px) { .four-drops, .four-board { gap: 4px; padding: 7px; } .race-board { gap: 3px; padding: 5px; } .race-cell { min-height: 70px; } .race-token { width: 17px; height: 17px; } }
   </style>
 </head>
 <body>
   <div id="root"></div>
+  <script src="games.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

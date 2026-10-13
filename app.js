@@ -122,7 +122,6 @@
     return list.sort(function (a, b) { return a.left - b.left; }).slice(0, 5);
   }
 
-  /* 사진 리사이즈 → base64 */
   /* ===== 상수 ===== */
   var QUESTIONS = [
     '처음 만났을 때 서로의 첫인상은?', '올해 꼭 같이 가보고 싶은 곳은?', '상대의 가장 사랑스러운 순간은 언제였어?',
@@ -134,8 +133,8 @@
   var BADGES = [
     { id: 'first_memory', ico: '📸', name: '첫 추억', cond: function (d) { return d.memories.length >= 1; } },
     { id: 'ten_memory', ico: '📚', name: '추억 10개', cond: function (d) { return d.memories.length >= 10; } },
-    { id: 'first_place', ico: '📍', name: '첫 장소', cond: function (d) { return d.places.length >= 1; } },
-    { id: 'explorer', ico: '🗺️', name: '탐험가(5곳)', cond: function (d) { return d.places.length >= 5; } },
+    { id: 'first_answer', ico: '💬', name: '첫 대화', cond: function (d) { return Object.keys(d.answers).some(function (key) { var a = d.answers[key]; return a && (a.me || a.you); }); } },
+    { id: 'mood_days', ico: '🌈', name: '기분 5일', cond: function (d) { return new Set(d.moods.map(function (m) { return m.date; })).size >= 5; } },
     { id: 'first_bucket', ico: '⭐', name: '첫 버킷', cond: function (d) { return d.buckets.length >= 1; } },
     { id: 'achiever', ico: '🏆', name: '달성 3개', cond: function (d) { return d.buckets.filter(function (b) { return b.done; }).length >= 3; } },
     { id: 'planner', ico: '📅', name: '첫 데이트 계획', cond: function (d) { return d.dates.length >= 1; } },
@@ -196,7 +195,7 @@
       h('div', { className: 'card' },
         h('p', { className: 'title-lg' }, '📊 우리 기록'),
         h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, textAlign: 'center' } },
-          Stat(data.memories.length, '추억'), Stat(data.places.length, '장소'),
+          Stat(data.memories.length, '추억'), Stat(Object.keys(data.answers).filter(function (key) { var a = data.answers[key]; return a && (a.me || a.you); }).length, '대화'),
           Stat(data.buckets.filter(function (b) { return b.done; }).length, '달성'), Stat(data.dates.length, '약속'))
       ),
       h('div', { className: 'card' },
@@ -298,108 +297,7 @@
       h('button', { className: 'btn block', disabled: !choices.length, onClick: function () { var pool = choices.filter(function (b) { return b.text !== result; }); if (!pool.length) pool = choices; setResult(pool[Math.floor(Math.random() * pool.length)].text); } }, result ? '다시 뽑기' : '데이트 뽑기'));
   }
 
-  /* ===== 지도 ===== */
-  function MapPage(props) {
-    var data = props.data, update = props.update;
-    var mapRef = useRef(null), mapObj = useRef(null), markers = useRef([]), overlays = useRef([]);
-    var pendingState = useState(null), pending = pendingState[0], setPending = pendingState[1];
-    var nameState = useState(''), name = nameState[0], setName = nameState[1];
-    var memoState = useState(''), memo = memoState[0], setMemo = memoState[1];
-    var readyState = useState(false), ready = readyState[0], setReady = readyState[1];
-    var errState = useState(''), mapErr = errState[0], setMapErr = errState[1];
-
-    // 카카오 SDK 로드 대기 → 지도 생성
-    useEffect(function () {
-      var tries = 0;
-      function init() {
-        if (mapObj.current || !mapRef.current) return;
-        if (!window.kakao || !window.kakao.maps) {
-          tries++;
-          if (tries > 50) { setMapErr('지도를 불러오지 못했어요. (카카오 키/도메인 설정 확인)'); return; }
-          setTimeout(init, 100); return;
-        }
-        window.kakao.maps.load(function () {
-          if (mapObj.current || !mapRef.current) return;
-          var kakao = window.kakao;
-          var first = data.places[0];
-          var center = new kakao.maps.LatLng(first ? first.lat : 37.5665, first ? first.lng : 126.9780);
-          var map = new kakao.maps.Map(mapRef.current, { center: center, level: 6 });
-          kakao.maps.event.addListener(map, 'click', function (e) {
-            var ll = e.latLng;
-            setPending({ lat: ll.getLat(), lng: ll.getLng() });
-          });
-          mapObj.current = map;
-          setReady(true);
-        });
-      }
-      init();
-    }, []);
-
-    // 마커 다시 그리기
-    useEffect(function () {
-      if (!ready || !mapObj.current || !window.kakao) return;
-      var kakao = window.kakao;
-      markers.current.forEach(function (m) { m.setMap(null); });
-      overlays.current.forEach(function (o) { o.setMap(null); });
-      markers.current = []; overlays.current = [];
-      data.places.forEach(function (p) {
-        var pos = new kakao.maps.LatLng(p.lat, p.lng);
-        var mk = new kakao.maps.Marker({ position: pos, map: mapObj.current });
-        var iw = new kakao.maps.InfoWindow({
-          content: '<div style="padding:6px 10px;font-size:13px;max-width:180px;"><b>' +
-            escapeHtml(p.name) + '</b>' + (p.memo ? '<br>' + escapeHtml(p.memo) : '') + '</div>'
-        });
-        kakao.maps.event.addListener(mk, 'click', function () { iw.open(mapObj.current, mk); });
-        markers.current.push(mk);
-      });
-    }, [data.places, ready]);
-
-    function savePlace() {
-      if (!name.trim()) { alert('장소 이름을 입력해주세요.'); return; }
-      update(function (d) { d.places.push({ id: uid(), name: name, memo: memo, lat: pending.lat, lng: pending.lng }); });
-      setPending(null); setName(''); setMemo('');
-    }
-    function del(id) { if (confirm('이 장소를 삭제할까요?')) update(function (d) { d.places = d.places.filter(function (p) { return p.id !== id; }); }); }
-    function focusPlace(p) {
-      if (mapObj.current && window.kakao) {
-        mapObj.current.setCenter(new window.kakao.maps.LatLng(p.lat, p.lng));
-        mapObj.current.setLevel(3);
-        window.scrollTo(0, 0);
-      }
-    }
-
-    return h('div', null,
-      h('h2', { className: 'title-xl', style: { marginBottom: 10 } }, '🗺️ 함께 간 곳'),
-      h('p', { className: 'muted', style: { marginBottom: 10 } }, '지도를 눌러 다녀온 장소를 추가하세요.'),
-      mapErr ? h('div', { className: 'card', style: { color: '#c0392b' } }, mapErr) : null,
-      h('div', { id: 'map', ref: mapRef }),
-      pending ? h(Modal, { onClose: function () { setPending(null); } },
-        h('p', { className: 'title-lg' }, '📍 이곳을 추가'),
-        h('label', null, '장소 이름'),
-        h('input', { placeholder: '예: 처음 간 카페', value: name, onChange: function (e) { setName(e.target.value); } }),
-        h('label', null, '메모'),
-        h('textarea', { placeholder: '추억 한 줄', value: memo, onChange: function (e) { setMemo(e.target.value); } }),
-        h('div', { className: 'row', style: { marginTop: 14 } },
-          h('button', { className: 'btn gray', onClick: function () { setPending(null); } }, '취소'),
-          h('button', { className: 'btn', onClick: savePlace }, '저장'))
-      ) : null,
-      h('div', { style: { marginTop: 14 } },
-        h('p', { className: 'title-lg' }, '우리가 찍은 핀 (' + data.places.length + ')'),
-        data.places.length === 0
-          ? h('div', { className: 'empty' }, '아직 등록한 장소가 없어요.')
-          : data.places.map(function (p) {
-            return h('div', { key: p.id, className: 'item' },
-              h('div', { className: 't' }, '📍 ' + p.name),
-              p.memo ? h('div', { className: 'm' }, p.memo) : null,
-              h('div', { style: { textAlign: 'right' } },
-                h('span', { className: 'link', onClick: function () { focusPlace(p); } }, '지도에서 보기'),
-                h('span', null, '  '),
-                h('span', { className: 'link', onClick: function () { del(p.id); } }, '삭제')));
-          }))
-    );
-  }
-
-  /* ===== 버킷 ===== */
+  /* ===== 버킷리스트 ===== */
   function BucketPage(props) {
     var data = props.data, update = props.update;
     var openState = useState(false), open = openState[0], setOpen = openState[1];
@@ -708,7 +606,7 @@
   var TABS = [
     { id: 'home', ico: '🏠', label: '홈', comp: HomePage },
     { id: 'memory', ico: '📖', label: '추억', comp: TimelinePage },
-    { id: 'map', ico: '🗺️', label: '지도', comp: MapPage },
+    { id: 'games', ico: '🎮', label: '게임', comp: window.FutariGames.GamePage },
     { id: 'bucket', ico: '⭐', label: '버킷', comp: BucketPage },
     { id: 'date', ico: '📅', label: '달력', comp: DatePlanPage },
     { id: 'play', ico: '🎲', label: '놀이', comp: PlayPage },
