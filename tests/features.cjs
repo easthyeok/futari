@@ -4,6 +4,7 @@ const React={createElement:(type,props,...children)=>({type,props:props||{},chil
 const context={window:{React,ReactDOM:{createRoot:()=>({render(){}})}},document:{getElementById:()=>({})},console,localStorage:{getItem:()=>null},alert:()=>{},confirm:()=>true,setTimeout,clearTimeout,setInterval,clearInterval};
 let src=fs.readFileSync(require('path').join(__dirname, '../app.js'),'utf8').replace('  try {\n    ReactDOM.createRoot', '  window.test = {TimelinePage,CoupleCalendar,DateRoulette,freshData,todayStr,memoryPhotos};\n  try {\n    ReactDOM.createRoot');
 vm.runInNewContext(fs.readFileSync(require('path').join(__dirname, '../games.js'),'utf8'),context);
+vm.runInNewContext(fs.readFileSync(require('path').join(__dirname, '../home.js'),'utf8'),context);
 vm.runInNewContext(src,context); const api=context.window.test;
 function render(comp,props,reset=false){if(reset)slots=[];cursor=0;return comp(props);}
 function all(n,p){if(!n||typeof n!=='object')return [];return (p(n)?[n]:[]).concat(...n.children.map(x=>all(x,p)));}
@@ -50,3 +51,13 @@ for(let i=0;i<18;i++){button(t,'카드 뽑기').props.onClick();t=render(games.G
 assert.equal(button(t,'모두 뽑았어요').props.disabled,true);button(t,'덱 다시 섞기').props.onClick();t=render(games.GamePage,gameProps);assert(text(t).includes('남은 카드 18장'));
 const appSource=fs.readFileSync(require('path').join(__dirname,'../app.js'),'utf8');const html=fs.readFileSync(require('path').join(__dirname,'../index.html'),'utf8');assert(!appSource.includes('MapPage'));assert(!html.includes('dapi.kakao'));assert(html.indexOf('src="games.js"')<html.indexOf('src="app.js"'));
 console.log('PASS: four-in-a-row all directions, full column, draw, terminal states, race events/finish, scoreboard/restart, 18 unique cards, map removal');
+
+const home=context.window.FutariHome; let shared=api.freshData(); const date='2026-10-14';
+home.act(shared,date,'me','choices',0); assert.equal(shared.memories.length,0);
+home.act(shared,date,'you','choices',1); assert.equal(shared.memories.length,1);
+home.act(shared,date,'you','choices',1); assert.equal(shared.memories.length,1);
+home.act(shared,date,'me','moods','😊'); home.act(shared,date,'you','reactions','🫶');
+const before=home.growth(shared); home.act(shared,date,'you','reactions','🫶'); assert.equal(home.growth(shared),before);
+home.act(shared,date,'me','activity',true); home.act(shared,date,'you','activity',true); home.act(shared,date,'you','activity',true); assert.equal(shared.memories.length,2);
+let screen=render(home.HomePage,{data:shared,member:'me',update:f=>f(shared)},true); assert.equal(all(screen,x=>x.type==='textarea'||x.type==='input').length,0);
+console.log('PASS: paired choices, automatic memories, idempotent rewards, shared activity, keyboard-free home');
