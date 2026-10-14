@@ -1,119 +1,138 @@
-/* 둘이 게임방 — 한 화면을 번갈아 쓰는 로컬 2인 게임 */
+/* 바운스오프 방식의 로컬 2인 게임 — 공을 당겨 튕겨 패턴을 완성 */
 (function () {
   'use strict';
-  var React = window.React, h = React.createElement, useState = React.useState;
-  var ROWS = 6, COLS = 7;
-  function newFour(first) { return { board: Array(42).fill(null), turn: first || 0, winner: null, draw: false, line: [], moves: 0 }; }
-  function dropFour(game, col) {
-    if (game.winner !== null || game.draw || !Number.isInteger(col) || col < 0 || col >= COLS) return game;
-    var row = ROWS - 1;
-    while (row >= 0 && game.board[row * COLS + col] !== null) row--;
-    if (row < 0) return game;
-    var board = game.board.slice(), player = game.turn, line = [];
-    board[row * COLS + col] = player;
-    [[0, 1], [1, 0], [1, 1], [1, -1]].some(function (dir) {
-      var run = [row * COLS + col];
-      [-1, 1].forEach(function (sign) {
-        var r = row + dir[0] * sign, c = col + dir[1] * sign;
-        while (r >= 0 && r < ROWS && c >= 0 && c < COLS && board[r * COLS + c] === player) {
-          run.push(r * COLS + c); r += dir[0] * sign; c += dir[1] * sign;
-        }
-      });
-      if (run.length >= 4) { line = run; return true; }
+  var React = window.React, h = React.createElement;
+  var SIZE = 6, CELL = 50, LEFT = 30, TOP = 20, LAUNCH = { x: 180, y: 410 };
+  var PATTERNS = [
+    { name: '작은 네모', cells: [[0,0],[0,1],[1,0],[1,1]] },
+    { name: '꺾인 길', cells: [[0,0],[1,0],[2,0],[2,1]] },
+    { name: '계단', cells: [[0,0],[1,1],[2,2],[3,3]] },
+    { name: '지그재그', cells: [[0,0],[0,1],[1,1],[1,2]] },
+    { name: '갈림길', cells: [[0,0],[0,1],[0,2],[1,1]] },
+    { name: '나란히', cells: [[0,0],[0,1],[0,2],[0,3]] },
+    { name: '작은 의자', cells: [[0,0],[1,0],[1,1],[2,1]] },
+    { name: '다이아몬드', cells: [[0,1],[1,0],[1,2],[2,1]] },
+    { name: '모서리', cells: [[0,0],[0,2],[2,0],[2,2]] }
+  ];
+  function shuffle() { var deck = PATTERNS.map(function (_, i) { return i; }); for (var i=deck.length-1;i>0;i--) { var j=Math.floor(Math.random()*(i+1)), v=deck[i]; deck[i]=deck[j]; deck[j]=v; } return deck; }
+  function newGame(first, deck) { return { board: Array(36).fill(null), turn: first || 0, remaining: [8,8], scores: [0,0], deck: deck || shuffle(), card: 0, roundWinner: null, winner: null, line: [], throws: 0, message: '아래 공을 뒤로 당겼다가 놓아보세요.' }; }
+  function variants(cells) {
+    var result = [], shape = cells;
+    for (var i=0;i<4;i++) {
+      var minR=Math.min.apply(null,shape.map(function (p) {return p[0];})), minC=Math.min.apply(null,shape.map(function (p) {return p[1];}));
+      result.push(shape.map(function (p) { return [p[0]-minR,p[1]-minC]; }));
+      shape=shape.map(function (p) { return [p[1],-p[0]]; });
+    }
+    return result;
+  }
+  function matchPattern(board, player, pattern) {
+    var shapes=variants(pattern), found=[];
+    shapes.some(function (shape) {
+      for (var r=0;r<SIZE;r++) for (var c=0;c<SIZE;c++) {
+        var indices=shape.map(function (p) { return (r+p[0])*SIZE+c+p[1]; });
+        if (shape.every(function (p) { return r+p[0]<SIZE && c+p[1]<SIZE && board[(r+p[0])*SIZE+c+p[1]]===player; })) { found=indices; return true; }
+      }
       return false;
     });
-    return { board: board, turn: 1 - player, winner: line.length ? player : null, draw: !line.length && game.moves + 1 === 42, line: line, moves: game.moves + 1 };
+    return found;
   }
-  var JUMPS = { 5: 8, 10: 7, 15: 19, 20: 17 };
-  var MISSIONS = {
-    4: '상대의 오늘 가장 귀여운 점을 하나 말해주세요.',
-    9: '둘이 다음에 먹고 싶은 음식을 하나씩 말해주세요.',
-    14: '상대에게 고마웠던 순간을 하나 말해주세요.',
-    22: '도착이 코앞! 상대에게 응원 한마디를 해주세요.'
-  };
-  function newRace(first) { return { positions: [0, 0], turn: first || 0, winner: null, roll: null, message: '출발! 첫 번째 주사위를 굴려주세요.', moves: 0 }; }
-  function rollRace(game, value) {
-    if (game.winner !== null || !Number.isInteger(value) || value < 1 || value > 6) return game;
-    var player = game.turn, positions = game.positions.slice(), land = Math.min(24, positions[player] + value);
-    var target = JUMPS[land] || land;
-    positions[player] = target;
-    var message = land === target ? target + '번 칸에 도착했어요.' : land + ' → ' + target + (target > land ? ' 지름길로 전진!' : ' 미끄럼틀로 뒤로!');
-    if (MISSIONS[target]) message += ' 💌 ' + MISSIONS[target];
-    return { positions: positions, turn: 1 - player, winner: target === 24 ? player : null, roll: value, message: message, moves: game.moves + 1 };
+  function aim(dx, dy) {
+    if (!Number.isFinite(dx) || !Number.isFinite(dy)) return null;
+    var length=Math.hypot(dx,dy); if (length<12 || dy>=-6) return null;
+    var limit=Math.min(1,110/length);
+    return { x: LAUNCH.x+dx*2.3*limit, y: LAUNCH.y+dy*4.2*limit, power: Math.min(100,Math.round(length/110*100)) };
   }
-  var CARDS = [
-    ['대화', '처음 만난 날로 돌아간다면 상대에게 어떤 말을 해줄래?'],
-    ['대화', '우리 둘이 가장 닮았다고 느끼는 점은?'],
-    ['대화', '상대와 꼭 만들어보고 싶은 새로운 전통은?'],
-    ['대화', '최근 가장 행복했던 우리 둘의 순간은?'],
-    ['대화', '둘만의 하루 휴가가 생기면 어디서 뭘 하고 싶어?'],
-    ['대화', '상대가 나를 잘 안다고 느꼈던 순간은?'],
-    ['미션', '상대 이름으로 짧은 삼행시를 지어주세요.'],
-    ['미션', '30초 동안 서로 칭찬을 하나씩 주고받아보세요.'],
-    ['미션', '상대를 주인공으로 영화 제목을 만들어주세요.'],
-    ['미션', '서로를 닮은 동물을 정하고 이유를 말해주세요.'],
-    ['미션', '지금 기분을 표정만으로 보여주고 맞혀보세요.'],
-    ['미션', '다음 데이트의 이름을 함께 지어주세요.'],
-    ['밸런스', '한 달간 매일 짧은 데이트 vs 한 번의 긴 여행, 하나를 골라 이유를 말해주세요.'],
-    ['밸런스', '계획표가 있는 여행 vs 목적지만 정한 여행, 서로의 선택은?'],
-    ['밸런스', '집에서 요리하기 vs 새로운 맛집 가기, 오늘의 선택은?'],
-    ['밸런스', '같이 새로운 취미 배우기 vs 서로의 취미 해보기, 어느 쪽이 좋아?'],
-    ['밸런스', '바닷가 일출 vs 산 위의 노을, 함께 보고 싶은 쪽은?'],
-    ['밸런스', '서프라이즈 선물 vs 같이 고르는 선물, 어느 쪽이 좋아?']
-  ];
+  function landing(point) {
+    if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return -1;
+    var c=Math.floor((point.x-LEFT)/CELL), r=Math.floor((point.y-TOP)/CELL);
+    if (r<0 || r>=SIZE || c<0 || c>=SIZE) return -1;
+    var x=LEFT+c*CELL+CELL/2, y=TOP+r*CELL+CELL/2;
+    return Math.hypot(point.x-x,point.y-y)<=20 ? r*SIZE+c : -1;
+  }
+  function throwBall(game, point) {
+    if (game.winner!==null || game.roundWinner!==null || !point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return game;
+    var player=game.turn; if (!game.remaining[player]) return game;
+    var next=Object.assign({},game,{board:game.board.slice(),remaining:game.remaining.slice(),scores:game.scores.slice(),throws:game.throws+1});
+    var index=landing(point);
+    next.remaining[player]--;
+    if (index<0) next.message='아쉽게 빗나갔어요! 방향과 힘을 조금 바꿔보세요.';
+    else if (next.board[index]!==null) next.message='이미 공이 있는 칸이에요. 공이 튕겨 나갔어요!';
+    else { next.board[index]=player; next.message='쏙! '+(Math.floor(index/SIZE)+1)+'행 '+(index%SIZE+1)+'열에 들어갔어요.'; }
+    next.line=matchPattern(next.board,player,PATTERNS[next.deck[next.card]].cells);
+    if (next.line.length) { next.roundWinner=player; next.scores[player]++; if (next.scores[player]>=3) next.winner=player; next.message='패턴 완성! 카드 한 장을 얻었어요.'; }
+    else if (!next.remaining[0] && !next.remaining[1]) { next.board=Array(36).fill(null); next.remaining=[8,8]; next.message='둘 다 공을 다 썼어요. 같은 카드로 다시 도전해요!'; }
+    next.turn=next.remaining[1-player]>0 ? 1-player : player;
+    return next;
+  }
+  function nextRound(game) {
+    if (game.roundWinner===null || game.winner!==null) return game;
+    return Object.assign({},game,{board:Array(36).fill(null),remaining:[8,8],turn:1-game.roundWinner,card:(game.card+1)%game.deck.length,roundWinner:null,line:[],message:'새로운 패턴! 이번에는 다른 사람이 먼저 던져요.'});
+  }
   function GamePage(props) {
-    var tabState = useState('four'), tab = tabState[0], setTab = tabState[1];
-    var fourState = useState(newFour()), four = fourState[0], setFour = fourState[1];
-    var raceState = useState(newRace()), race = raceState[0], setRace = raceState[1];
-    var scoresState = useState([0, 0]), scores = scoresState[0], setScores = scoresState[1];
-    var deckState = useState([]), used = deckState[0], setUsed = deckState[1];
-    var cardState = useState(null), card = cardState[0], setCard = cardState[1];
-    var filterState = useState('전체'), filter = filterState[0], setFilter = filterState[1];
-    var names = [props.data.settings.me || '나', props.data.settings.you || '너'];
-    var game = tab === 'four' ? four : race;
-    function record(next, previous) { if (next.winner !== null && previous.winner === null) setScores(function (s) { var result = s.slice(); result[next.winner]++; return result; }); }
-    function restart() {
-      if (game.moves && game.winner === null && !game.draw && !confirm('진행 중인 게임을 새로 시작할까요?')) return;
-      var first = game.winner !== null ? 1 - game.winner : 1 - game.turn;
-      if (tab === 'four') setFour(newFour(first)); else setRace(newRace(first));
+    var gs=React.useState(newGame()), game=gs[0], setGame=gs[1];
+    var as=React.useState(null), aiming=as[0], setAim=as[1];
+    var fs=React.useState(null), flight=fs[0], setFlight=fs[1];
+    var drag=React.useRef(null), busy=React.useRef(false), frame=React.useRef(null);
+    React.useEffect(function () { return function () { if (frame.current!==null) window.cancelAnimationFrame(frame.current); busy.current=false; }; }, []);
+    var names=[props.data.settings.me || '나',props.data.settings.you || '너'];
+    var finished=game.roundWinner!==null, pattern=PATTERNS[game.deck[game.card]];
+    function coordinates(event) { var rect=event.currentTarget.getBoundingClientRect(); return {x:(event.clientX-rect.left)*360/rect.width,y:(event.clientY-rect.top)*460/rect.height}; }
+    function begin(event) {
+      if (busy.current || finished || (event.pointerType==='mouse' && event.button!==0)) return;
+      var point=coordinates(event); if (point.y<345) return;
+      event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId);
+      drag.current={x:point.x,y:point.y,id:event.pointerId}; setAim(null);
     }
-    function drawCard() {
-      var pool = CARDS.map(function (_, i) { return i; }).filter(function (i) { return (filter === '전체' || CARDS[i][0] === filter) && used.indexOf(i) < 0; });
-      if (!pool.length) return;
-      var index = pool[Math.floor(Math.random() * pool.length)]; setCard(index); setUsed(used.concat([index]));
+    function move(event) { if (!drag.current || drag.current.id!==event.pointerId) return; var point=coordinates(event); setAim(aim(drag.current.x-point.x,drag.current.y-point.y)); }
+    function cancel(event) { if (drag.current && drag.current.id===event.pointerId) { drag.current=null; setAim(null); } }
+    function shoot(target) {
+      if (!target || busy.current || finished) return;
+      busy.current=true; setAim(null);
+      var start=null;
+      function animate(time) {
+        if (start===null) start=time;
+        var t=Math.min(1,(time-start)/950), hop=Math.abs(Math.sin(t*Math.PI*3))*(1-t)*42;
+        setFlight({x:LAUNCH.x+(target.x-LAUNCH.x)*t,y:LAUNCH.y+(target.y-LAUNCH.y)*t-hop,scale:1+hop/90});
+        if (t<1) frame.current=window.requestAnimationFrame(animate);
+        else { frame.current=null; setFlight(null); setGame(function (current) { return throwBall(current,target); }); busy.current=false; }
+      }
+      frame.current=window.requestAnimationFrame(animate);
     }
-    var body;
-    if (tab === 'cards') {
-      var remaining = CARDS.filter(function (c, i) { return (filter === '전체' || c[0] === filter) && used.indexOf(i) < 0; }).length;
-      body = h('section', { className: 'card' }, h('h2', { className: 'title-lg' }, '💌 둘만의 카드 덱'),
-        h('p', { className: 'muted' }, '정답도 승패도 없어요. 번갈아 뽑고, 부담스러운 카드는 편하게 넘겨요.'),
-        h('select', { value: filter, 'aria-label': '카드 종류', onChange: function (e) { setFilter(e.target.value); setCard(null); } }, ['전체', '대화', '미션', '밸런스'].map(function (x) { return h('option', { key: x }, x); })),
-        h('div', { className: 'couple-card', 'aria-live': 'polite' }, h('span', { className: 'pill pink' }, card === null ? '우리 둘의 시간' : CARDS[card][0]), h('p', null, card === null ? '카드 한 장으로 시작하는 작은 데이트' : CARDS[card][1])),
-        h('p', { className: 'muted center' }, '남은 카드 ' + remaining + '장 · 같은 카드는 다시 나오지 않아요'),
-        h('div', { className: 'row' }, h('button', { className: 'btn', onClick: drawCard, disabled: remaining === 0 }, remaining ? '카드 뽑기' : '모두 뽑았어요'), h('button', { className: 'btn ghost', onClick: function () { setUsed([]); setCard(null); } }, '덱 다시 섞기')));
-    } else {
-      var finished = game.winner !== null || game.draw;
-      var status = game.winner !== null ? '🏆 ' + names[game.winner] + ' 승리!' : game.draw ? '🤝 무승부! 한 판 더?' : names[game.turn] + ' 차례';
-      body = h('section', { className: 'card game-table' },
-        h('div', { className: 'game-status', role: 'status', 'aria-live': 'polite' }, status),
-        h('div', { className: 'player-legend' }, names.map(function (name, i) { return h('span', { key: i, className: 'player-tag player-' + i + (!finished && game.turn === i ? ' current' : '') }, (i === 0 ? '♥ ' : '★ ') + name); })),
-        tab === 'four' ? h('div', null,
-          h('p', { className: 'muted center' }, '열의 화살표를 눌러 말을 떨어뜨려요. 가로·세로·대각선 4개를 먼저 이으면 승리!'),
-          h('div', { className: 'four-drops' }, Array.from({ length: COLS }, function (_, col) { return h('button', { key: col, className: 'drop-button', disabled: finished || four.board[col] !== null, 'aria-label': (col + 1) + '열에 놓기', onClick: function () { var next = dropFour(four, col); record(next, four); setFour(next); } }, '↓'); })),
-          h('div', { className: 'four-board', role: 'img', 'aria-label': '사목 판. ' + four.board.map(function (v, i) { return v === null ? '' : (Math.floor(i / COLS) + 1) + '행 ' + (i % COLS + 1) + '열 ' + names[v]; }).filter(Boolean).join(', ') }, four.board.map(function (v, i) { return h('div', { key: i, className: 'four-cell' + (v === null ? '' : ' token-' + v) + (four.line.indexOf(i) >= 0 ? ' winning' : ''), 'aria-hidden': true }, v === null ? '' : v === 0 ? '♥' : '★'); }))) : h('div', null,
-          h('p', { className: 'muted center' }, '주사위를 번갈아 굴려 24번 칸에 먼저 도착하세요. 넘쳐도 도착! 화살표 칸은 이동하고 💌 칸에서는 미션을 해봐요.'),
-          h('div', { className: 'race-board', 'aria-label': '주사위 레이스 판' }, Array.from({ length: 24 }, function (_, index) {
-            var row = Math.floor(index / 6), col = index % 6, tile = (3 - row) * 6 + (row % 2 === 0 ? col + 1 : 6 - col);
-            return h('div', { key: tile, className: 'race-cell' + (tile === 24 ? ' finish' : '') + (JUMPS[tile] ? ' jump' : '') }, h('span', { className: 'tile-number' }, tile === 24 ? '🏁 24' : tile), h('span', { className: 'tile-event' }, JUMPS[tile] ? '→ ' + JUMPS[tile] : MISSIONS[tile] ? '💌' : ''), h('div', { className: 'race-tokens' }, game.positions.map(function (pos, player) { return pos === tile ? h('span', { key: player, className: 'race-token token-' + player, 'aria-label': names[player] }, player === 0 ? '♥' : '★') : null; })));
-          })),
-          h('p', { className: 'muted center' }, names.map(function (name, i) { return name + ': ' + (race.positions[i] ? race.positions[i] + '번' : '출발점'); }).join(' · ')),
-          h('p', { className: 'race-message', role: 'status', 'aria-live': 'polite' }, race.message),
-          h('button', { className: 'btn block dice-button', disabled: finished, onClick: function () { var next = rollRace(race, Math.floor(Math.random() * 6) + 1); record(next, race); setRace(next); } }, (race.roll ? ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'][race.roll - 1] : '🎲') + ' ' + (finished ? '레이스 종료' : names[race.turn] + ' 주사위 굴리기'))),
-        h('button', { className: 'btn ghost block', style: { marginTop: 14 }, onClick: restart }, finished ? '한 판 더!' : '새 게임'));
+    function release(event) {
+      if (!drag.current || drag.current.id!==event.pointerId) return;
+      var point=coordinates(event), target=aim(drag.current.x-point.x,drag.current.y-point.y);
+      drag.current=null; setAim(null); shoot(target);
     }
-    return h('div', null, h('h1', { className: 'title-xl' }, '🎮 둘이 게임방'), h('p', { className: 'muted' }, '휴대폰 하나로 마주 앉아 번갈아 즐겨요. 게임 진행은 이 화면에서만 유지돼요.'),
-      h('div', { className: 'game-score' }, h('span', null, '이번 게임방 승수'), h('strong', null, names[0] + ' ' + scores[0] + ' : ' + scores[1] + ' ' + names[1])),
-      h('div', { className: 'seg' }, [['four', '🔴 사목'], ['race', '🎲 레이스'], ['cards', '💌 카드 덱']].map(function (x) { return h('button', { key: x[0], className: tab === x[0] ? 'on' : '', 'aria-pressed': tab === x[0], onClick: function () { setTab(x[0]); } }, x[1]); })), body);
+    function keyboard(event) {
+      if (finished || busy.current) return;
+      var target=aiming || {x:180,y:195,power:50};
+      var dx={ArrowLeft:-10,ArrowRight:10}[event.key] || 0, dy={ArrowUp:-10,ArrowDown:10}[event.key] || 0;
+      if (dx || dy) { event.preventDefault(); setAim({x:Math.max(5,Math.min(355,target.x+dx)),y:Math.max(5,Math.min(330,target.y+dy)),power:target.power}); }
+      if (event.key==='Enter' || event.key===' ') { event.preventDefault(); shoot(target); }
+    }
+    return h('div',null,
+      h('h1',{className:'title-xl'},'🏓 바운스오프'),
+      h('p',{className:'muted'},'휴대폰 하나로 번갈아 던져요. 같은 색 공으로 패턴을 만들고 카드 3장을 먼저 모으면 승리!'),
+      h('div',{className:'bounce-scores'},names.map(function (name,i) {return h('div',{key:i,className:'player-tag player-'+i+(game.turn===i&&!finished?' current':'')},name,h('strong',null,' '+game.scores[i]+' / 3'),h('small',null,'남은 공 '+game.remaining[i]+'개'));})),
+      h('section',{className:'bounce-challenge','aria-label':'목표 패턴 '+pattern.name},
+        h('svg',{viewBox:'0 0 100 100',className:'pattern-preview','aria-hidden':true},pattern.cells.map(function (p,i) {return h('circle',{key:i,cx:15+p[1]*22,cy:15+p[0]*22,r:8,fill:'#c87f51'});})),
+        h('div',null,h('span',{className:'eyebrow'},'CHALLENGE '+(game.card+1)),h('h2',{className:'title-lg'},pattern.name),h('p',{className:'muted'},'위치와 회전은 자유 · 내 색 공으로 완성'))),
+      h('div',{className:'game-status',role:'status','aria-live':'polite'},game.winner!==null?'🏆 '+names[game.winner]+' 최종 승리!':finished?'🎉 '+names[game.roundWinner]+' 카드 획득!':names[game.turn]+' 차례'),
+      h('svg',{viewBox:'0 0 360 460',className:'bounce-table',role:'application',tabIndex:0,'aria-label':'바운스오프 게임판. 아래 공을 뒤로 당겨 놓으세요. 키보드는 방향키로 조준하고 Enter로 던집니다.',onPointerDown:begin,onPointerMove:move,onPointerUp:release,onPointerCancel:cancel,onLostPointerCapture:cancel,onKeyDown:keyboard},
+        h('defs',null,h('radialGradient',{id:'bounce-ball'},h('stop',{offset:'0%',stopColor:'#ffffff',stopOpacity:.65}),h('stop',{offset:'100%',stopColor:'#ffffff',stopOpacity:0}))),
+        h('rect',{x:18,y:8,width:324,height:324,rx:24,fill:'#86634b'}),
+        game.board.map(function (value,i) {var x=LEFT+(i%SIZE)*CELL+25,y=TOP+Math.floor(i/SIZE)*CELL+25;return h('g',{key:i},h('circle',{cx:x,cy:y,r:21,fill:'#543d30'}),value!==null?h('circle',{cx:x,cy:y,r:18,fill:value===0?'#ec6688':'#3485a8',stroke:game.line.indexOf(i)>=0?'#ffe680':'#ffffff55',strokeWidth:game.line.indexOf(i)>=0?4:1}):null,value!==null?h('circle',{cx:x-5,cy:y-6,r:7,fill:'url(#bounce-ball)'}):null);}),
+        aiming?h('g',{pointerEvents:'none'},h('line',{x1:LAUNCH.x,y1:LAUNCH.y,x2:aiming.x,y2:aiming.y,stroke:'#9c7e65',strokeDasharray:'6 8',strokeWidth:2}),h('circle',{cx:aiming.x,cy:aiming.y,r:12,fill:'none',stroke:'#d83c6b',strokeWidth:2})):null,
+        h('line',{x1:35,y1:350,x2:325,y2:350,stroke:'#d9bfa5',strokeDasharray:'4 5'}),
+        h('text',{x:180,y:377,textAnchor:'middle',fontSize:12,fill:'#826651'},flight?'공이 튕기는 중…':'여기서 아래로 당겼다가 놓으세요 ↓'),
+        h('circle',{cx:180,cy:410,r:24,fill:'none',stroke:'#d5b9a0',strokeWidth:2}),
+        !flight?h('circle',{cx:180,cy:410,r:18,fill:game.turn===0?'#ec6688':'#3485a8'}):null,
+        flight?h('g',{pointerEvents:'none'},h('ellipse',{cx:flight.x,cy:flight.y+12,rx:13,ry:4,fill:'#00000025'}),h('circle',{cx:flight.x,cy:flight.y,r:16*flight.scale,fill:game.turn===0?'#ec6688':'#3485a8'})):null),
+      h('p',{className:'bounce-feedback',role:'status','aria-live':'polite'},game.message),
+      h('p',{className:'muted'},'많이 당길수록 멀리 날아가요. 좌우로 당겨 방향을 바꿔요. 빈 구멍 안에 들어가야 공이 남아요.'),
+      finished?h('button',{className:'btn block',onClick:function () {setAim(null);setGame(game.winner!==null?newGame(1-game.winner):nextRound(game));}},game.winner!==null?'한 경기 더!':'다음 카드 →'):null,
+      h('button',{className:'btn ghost block',disabled:!!flight,style:{marginTop:10},onClick:function () {if(game.throws&&!confirm('현재 카드와 점수를 지우고 새 경기를 시작할까요?'))return;drag.current=null;setAim(null);setGame(newGame());}},'새 경기'),
+      h('p',{className:'muted center'},'진행과 점수는 이 화면에서 유지돼요. 다른 화면으로 이동하면 새로 시작해요.'));
   }
-  window.FutariGames = { GamePage: GamePage, newFour: newFour, dropFour: dropFour, newRace: newRace, rollRace: rollRace };
+  window.FutariGames={GamePage:GamePage,newGame:newGame,throwBall:throwBall,nextRound:nextRound,matchPattern:matchPattern,aim:aim,landing:landing,patterns:PATTERNS};
 })();

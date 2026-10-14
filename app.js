@@ -15,13 +15,14 @@
   function freshData() {
     return {
       settings: { me: '나', you: '너', startDate: '', anniversaries: [] },
-      memories: [], places: [], buckets: [], dates: [], moods: [], polls: [], answers: {}, together: {},
+      memories: [], places: [], buckets: [], dates: [], moods: [], polls: [], answers: {}, together: {}, boardGames: {},
     };
   }
   function normalizeData(raw) {
     var d = Object.assign(freshData(), raw || {});
     d.settings = Object.assign(freshData().settings, d.settings);
     d.together = d.together || {};
+    d.boardGames = d.boardGames || {};
     return d;
   }
   function loadData() {
@@ -622,7 +623,7 @@
   /* ===== 메인 App ===== */
   function TogetherPage(props) {
     var state = useState('date'), section = state[0], setSection = state[1];
-    var options = [['date', '📅 약속', DatePlanPage], ['bucket', '⭐ 하고 싶은 일', BucketPage], ['games', '🎮 미니게임', window.FutariGames.GamePage]];
+    var options = [['date', '📅 약속', DatePlanPage], ['bucket', '⭐ 하고 싶은 일', BucketPage], ['games', '🎲 보드게임', window.FutariBoardGames.BoardHub]];
     return h('div', null, h('div', { className: 'seg' }, options.map(function (x) { return h('button', { key: x[0], className: section === x[0] ? 'on' : '', onClick: function () { setSection(x[0]); } }, x[1]); })), h(options.find(function (x) { return x[0] === section; })[2], props));
   }
   var TABS = [
@@ -679,7 +680,7 @@
     var tabState = useState('home'), tab = tabState[0], setTab = tabState[1];
     var loadingState = useState(!!getRoomCode() && !cachedRoom(getRoomCode())), loading = loadingState[0], setLoading = loadingState[1];
     var syncState = useState(''), syncMsg = syncState[0], setSyncMsg = syncState[1];
-    var saveTimer = useRef(null);
+    var saveTimer = useRef(null), immediateSave = useRef(false);
     var dirty = useRef(!!(cachedRoom(getRoomCode()) || {}).pending), revision = useRef(0), saveQueue = useRef(Promise.resolve());
     var retryState = useState(0), retry = retryState[0], setRetry = retryState[1];
     var skipSave = useRef(true); // 최초 로드 직후 저장 방지
@@ -708,6 +709,7 @@
       dirty.current = true;
       var version = ++revision.current, cancelled = false;
       setSyncMsg('저장 중…');
+      var saveDelay = immediateSave.current ? 0 : 1200; immediateSave.current = false;
       saveTimer.current = setTimeout(function () {
         saveTimer.current = null;
         saveQueue.current = saveQueue.current.catch(function () {}).then(function () {
@@ -720,14 +722,14 @@
             if (!cancelled && version === revision.current) setSyncMsg('저장 실패 · ' + e.message + ' · 눌러서 다시 시도');
           });
         });
-      }, 1200);
+      }, saveDelay);
       return function () { cancelled = true; if (saveTimer.current) clearTimeout(saveTimer.current); saveTimer.current = null; };
     }, [data, room, retry]);
 
     useEffect(function () {
       if (!room || data == null) return;
       var active = true;
-      var iv = setInterval(function () {
+      function refresh() {
         if (dirty.current) return;
         var version = revision.current;
         cloudLoad(room, function () { return active && !dirty.current && version === revision.current; }).then(function (remote) {
@@ -735,11 +737,14 @@
             skipSave.current = true; setData(remote); cacheRoom(room, remote, false);
           }
         }).catch(function () {});
-      }, 10000);
-      return function () { active = false; clearInterval(iv); };
+      }
+      var iv = setInterval(refresh, 10000);
+      function onVisible() { if (document.visibilityState === 'visible') refresh(); }
+      window.addEventListener('focus', refresh); document.addEventListener('visibilitychange', onVisible);
+      return function () { active = false; clearInterval(iv); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', onVisible); };
     }, [room, data]);
 
-    function update(mutator) { dirty.current = true; revision.current++; setData(function (prev) { var next = clone(prev); mutator(next); cacheRoom(room, next, true); return next; }); }
+    function update(mutator, immediate) { if (immediate) immediateSave.current = true; dirty.current = true; revision.current++; setData(function (prev) { var next = clone(prev); mutator(next); cacheRoom(room, next, true); return next; }); }
     function recoverRemote() {
       if (!confirm('이 기기의 미저장 변경을 버리고 상대가 저장한 내용을 불러올까요? 필요한 기록은 먼저 설정에서 백업해주세요.')) return;
       revision.current++;
@@ -767,7 +772,7 @@
     var member = identity;
     if (!member) { try { member = localStorage.getItem('futari_identity_' + room) || ''; } catch (e) {} }
     if (member !== 'me' && member !== 'you') return h('div', { className: 'app' }, h('div', { className: 'card' }, h('h1', { className: 'title-xl' }, '이 기기는 누가 사용하나요?'), h('p', { className: 'muted' }, '각자 자신의 이름을 골라주세요. 다음부터는 기억할게요.'), h('div', { className: 'row' }, ['me', 'you'].map(function (who) { return h('button', { key: who, className: 'btn', onClick: function () { chooseIdentity(who); } }, data.settings[who]); }))));
-    var pageProps = { member: member, changeMember: function () { try { localStorage.removeItem('futari_identity_' + room); } catch (e) {} setIdentity(''); }, data: data, update: update, setData: function (replacement) { dirty.current = true; revision.current++; cacheRoom(room, replacement, true); setData(replacement); }, room: room, leaveRoom: leaveRoom };
+    var pageProps = { member: member, changeMember: function () { try { localStorage.removeItem('futari_identity_' + room); } catch (e) {} setIdentity(''); }, data: data, update: update, updateGame: function (mutator) { update(mutator, true); }, setData: function (replacement) { dirty.current = true; revision.current++; cacheRoom(room, replacement, true); setData(replacement); }, room: room, leaveRoom: leaveRoom };
     var current = tab === 'settings' ? { comp: SettingsPage } : TABS.find(function (t) { return t.id === tab; });
 
     return h('div', { className: 'app' },

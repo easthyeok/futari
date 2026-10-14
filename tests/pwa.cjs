@@ -44,7 +44,7 @@ async function worker(base) {
   assert.equal(trigger({url:new URL('app.js',base).href,method:'POST',mode:'cors'}),undefined);
   assert.equal(trigger({url:new URL('unknown',base).href,method:'GET',mode:'navigate'}),undefined);
   assert.equal(networkCalls,0, 'offline shell should not need the network');
-  for(const key of stores.get(prefix + 'v1').keys()) assert(!new URL(key).search,'room links must not enter cache');
+  for(const key of stores.get(prefix + 'v2').keys()) assert(!new URL(key).search,'room links must not enter cache');
   const start=new URL(manifest.start_url,new URL('manifest.webmanifest',base));
   assert.equal(start.href,base); assert.equal(new URL(manifest.scope,base).href,base);
 }
