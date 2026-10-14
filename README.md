@@ -33,7 +33,8 @@ python3 -m http.server 8000
 
 - HTTPS 주소를 크롬에서 직접 여세요. 카톡 등의 앱 내부 브라우저 대신 크롬을 사용하세요.
 - 설치 가능한 상태가 되면 화면 상단의 ‘앱 설치’를 누르거나 크롬 메뉴에서 ‘앱 설치 / 홈 화면에 추가’를 선택하세요. 설치 안내가 바로 나타나는 시점은 브라우저 상태와 사용 이력에 따라 달라집니다.
-- iPhone은 Safari 공유 메뉴의 ‘홈 화면에 추가’를 사용하세요.
+- iPhone·iPad Safari에서는 설치 안내 팝업을 자동 표시합니다. 공유 → 홈 화면에 추가 → 추가 순서로 진행하며, ‘웹 앱으로 열기’가 보이면 켭니다. Safari는 웹에서 네이티브 설치 창을 직접 호출할 수 없어 안내 팝업을 사용합니다.
+- 안내를 닫으면 같은 탭 세션에서는 다시 자동 표시하지 않습니다. 상단 ‘앱 설치 안내’에서 언제든 다시 열 수 있고, 홈 화면에서 앱으로 실행 중이면 안내하지 않습니다. 데스크톱 모드 iPad도 감지하며 Mac Safari에는 Dock에 추가 방법을 안내합니다.
 - 개발용 `http://localhost:8000`은 서비스 워커를 사용할 수 있지만 휴대폰에서 PC의 `http://192.168…` 주소로 접속하면 보안 연결 요건을 충족하지 못합니다.
 
 Chrome DevTools → Application에서 Manifest의 아이콘·시작 주소·오류와 Service Workers의 활성 상태를 확인하세요. Network의 Offline을 켜고 새로고침하여 화면이 열리는지 확인하세요. 매니페스트와 아이콘 URL이 HTML 오류 페이지 대신 실제 JSON/PNG로 응답해야 합니다.
@@ -125,6 +126,7 @@ node tests/sync.cjs
 node --check sw.js
 node --check pwa.js
 node tests/pwa.cjs
+node tests/safari-install.cjs
 node --check recovery.js
 node tests/recovery.cjs
 ```
