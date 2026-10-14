@@ -120,3 +120,67 @@ body.game-mode #root { max-width:820px; }
 .mission-bonus { padding:12px; border-radius:12px; background:#fff0cc; font-size:13px; line-height:1.6; }
 .house-shelf { display:flex; gap:8px; }
 @media(prefers-reduced-motion:no-preference) { .furniture:hover .furniture-icon { transform:translateY(-3px); transition:transform .2s; } }
+
+/* NEON DRIFT — canvas arcade */
+.dodge-game { --neon:#83ece5; color:#e8edf9; max-width:560px; margin:0 auto; }
+.dodge-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:4px 0 20px; }
+.dodge-kicker { display:block; font-size:9px; font-weight:800; letter-spacing:.16em; color:#83ece5; }
+.dodge-heading h2 { font-size:clamp(26px,7vw,38px); letter-spacing:-.06em; margin:8px 0 5px; font-weight:900; }
+.dodge-heading p { margin:0; font-size:12px; color:#a7b3ce; }
+.dodge-icon-button { border:1px solid #56628766; background:#182238; border-radius:10px; color:#b8c7e4; min-height:42px; padding:8px 12px; font:inherit; font-size:11px; cursor:pointer; }
+.dodge-hud { display:flex; align-items:center; gap:22px; background:#111b2f; padding:14px 18px; border:1px solid #34415f; border-bottom:0; border-radius:18px 18px 0 0; }
+.dodge-hud small { display:block; font-size:8px; letter-spacing:.12em; color:#98a9cc; margin-bottom:5px; }
+.dodge-hud strong { display:block; font-variant-numeric:tabular-nums; font-size:24px; font-weight:800; line-height:1.15; }
+.dodge-hud strong span { font-size:12px; color:#83ece5; }
+.dodge-stage { margin-left:auto; text-align:right; }
+.dodge-stage>span { font-size:8px; color:#bca5f5; }
+.dodge-surface { position:relative; overflow:hidden; border:1px solid #34415f; background:#090e20; }
+.dodge-canvas { display:block; width:100%; max-height:65svh; aspect-ratio:3/4; object-fit:fill; touch-action:none; user-select:none; outline-offset:-4px; }
+.dodge-canvas:focus-visible { outline:2px solid #83ece5; }
+.dodge-overlay { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:22px; text-align:center; background:linear-gradient(#090e2077,#0b1228ef); }
+.dodge-overlay h3 { margin:14px 0 4px; font-size:clamp(20px,5vw,27px); color:#f4f5ff; }
+.dodge-overlay p { font-size:12px; line-height:1.8; color:#b8c4df; margin:12px 0 22px; }
+.dodge-overlay>small { font-size:10px; color:#91a3c3; margin-top:16px; line-height:1.7; }
+.dodge-orbit { display:grid; place-items:center; width:70px; height:70px; margin-bottom:22px; border:1px solid #83ece566; border-radius:50%; box-shadow:0 0 55px #83ece51a,inset 0 0 22px #83ece51a; color:#83ece5; font-size:38px; }
+.dodge-primary { width:100%; min-height:48px; border:1px solid #b4fff4; border-radius:12px; background:linear-gradient(115deg,#8cf5e6,#91bdf7); color:#101d32; font:inherit; font-size:13px; font-weight:800; cursor:pointer; padding:12px 16px; box-shadow:0 5px 20px #83ece515; }
+.dodge-overlay .dodge-primary { max-width:240px; }
+.dodge-primary:disabled { cursor:default; opacity:.4; box-shadow:none; }
+.dodge-primary:active:not(:disabled) { transform:translateY(1px); }
+.dodge-secondary { border:0; background:transparent; color:#b5c9ee; text-decoration:underline; text-underline-offset:4px; font:inherit; font-size:12px; min-height:44px; margin-top:10px; cursor:pointer; }
+.dodge-score { font-size:clamp(48px,12vw,70px); font-weight:900; font-variant-numeric:tabular-nums; letter-spacing:-.06em; color:#92f7e8; line-height:1.2; margin-top:10px; }
+.dodge-score small { display:block; font-size:9px; letter-spacing:.3em; color:#a8b8d8; }
+.dodge-control-strip { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:9px 12px; min-height:54px; border:1px solid #34415f; border-top:0; border-radius:0 0 16px 16px; background:#111b2f; font-size:10px; color:#9caed0; }
+.dodge-control-strip button { min-height:34px; }
+.dodge-challenge { margin:24px 0 0; padding:20px; background:linear-gradient(140deg,#1e2b40,#192335); border:1px solid #43526e; border-radius:20px; }
+.dodge-section-title { display:flex; justify-content:space-between; gap:10px; align-items:center; }
+.dodge-section-title h3 { font-size:19px; margin:8px 0 0; }
+.dodge-ticket { flex:none; padding:7px 9px; background:#83ece51a; border:1px solid #83ece533; border-radius:8px; font-size:10px; color:#aaf4e7; }
+.dodge-description { font-size:12px; color:#aebdd7; line-height:1.8; margin:14px 0 18px; }
+.dodge-leaderboard { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.dodge-player { background:#101a2c; border:1px solid #35425e; padding:14px 10px; border-radius:14px; min-width:0; }
+.dodge-player.mine { border-color:#83ece566; }
+.dodge-player>span { font-size:12px; display:block; overflow-wrap:anywhere; }
+.dodge-player>span small { font-size:9px; color:#83ece5; }
+.dodge-player>strong { display:block; font-size:27px; letter-spacing:-.04em; font-variant-numeric:tabular-nums; margin:9px 0 12px; }
+.dodge-attempts { display:flex; gap:4px; }
+.dodge-attempts span { flex:1; text-align:center; padding:5px 1px; background:#263149; border-radius:5px; color:#8fa0c1; font-size:9px; font-variant-numeric:tabular-nums; }
+.dodge-attempts .used { background:#83ece51a; color:#b1ecde; }
+.dodge-verdict { color:#e8dcae; font-size:12px; min-height:20px; line-height:1.6; text-align:center; margin:18px 0 12px; }
+.dodge-note { display:block; margin-top:12px; color:#98a8c6; font-size:10px; line-height:1.8; }
+.dodge-help { margin-top:20px; color:#adbed9; font-size:12px; line-height:1.8; }
+.dodge-help summary { min-height:44px; padding-top:10px; }
+.dodge-lobby-art { position:relative; display:grid; place-items:center; width:126px; height:110px; border-radius:18px; border:1px solid #7488b944; background:radial-gradient(ellipse at center,#263852,#101a2f); overflow:hidden; }
+.dodge-lobby-art span { color:#83ece5; font-size:40px; text-shadow:0 0 25px #83ece5; }
+.dodge-lobby-art i { position:absolute; width:7px; height:7px; border-radius:50%; background:#ff799e; box-shadow:0 0 12px #ff799e; top:20px; left:26px; }
+.dodge-lobby-art i:nth-of-type(2) { top:70px; left:96px; background:#bba2ff; }
+.dodge-lobby-art i:nth-of-type(3) { top:26px; left:100px; background:#69e6e2; }
+@media(min-width:650px){.arena-game-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:370px){.dodge-hud{gap:15px;padding:12px}.dodge-challenge{padding:16px}.dodge-attempts{gap:2px}.dodge-player{padding:12px 8px}}
+@media(prefers-reduced-motion:reduce){.dodge-primary:active:not(:disabled){transform:none}}
+.dodge-archive { margin-top:20px; padding:0 16px 12px; background:#111b2f; border:1px solid #34415f; border-radius:14px; font-size:12px; color:#adbed9; }
+.dodge-archive summary { padding:16px 0; }
+.dodge-personal { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:8px 0 14px; }
+.dodge-personal small { display:block; font-size:10px; }
+.dodge-personal strong { display:block; margin-top:6px; font-size:23px; color:#83ece5; font-variant-numeric:tabular-nums; }
+.dodge-archive-row { display:grid; grid-template-columns:1.3fr 1fr 1fr; gap:8px; border-top:1px solid #34415f; padding:10px 0; font-size:10px; font-variant-numeric:tabular-nums; }
+.dodge-archive-row strong { text-align:right; }

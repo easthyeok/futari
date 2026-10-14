@@ -15,7 +15,7 @@
   function freshData() {
     return {
       settings: { me: '나', you: '너', startDate: '', anniversaries: [] },
-      memories: [], places: [], buckets: [], dates: [], moods: [], polls: [], answers: {}, together: {}, house: { owned: [], equipped: {} }, boardGames: {}, gameResults: [],
+      memories: [], places: [], buckets: [], dates: [], moods: [], polls: [], answers: {}, together: {}, house: { owned: [], equipped: {} }, boardGames: {}, gameResults: [], dodge: {},
     };
   }
   function normalizeData(raw) {
@@ -25,6 +25,7 @@
     d.house = d.house || { owned: [], equipped: {} };
     d.boardGames = d.boardGames || {};
     d.gameResults = d.gameResults || [];
+    d.dodge = d.dodge || {};
     return d;
   }
   function loadData() {
@@ -45,6 +46,7 @@
       base.house = p.house || base.house;
       base.boardGames = p.boardGames || {};
       base.gameResults = p.gameResults || [];
+      base.dodge = p.dodge || {};
       return base;
     } catch (e) { console.warn('load failed', e); return freshData(); }
   }
