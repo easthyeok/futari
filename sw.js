@@ -2,7 +2,7 @@
 'use strict';
 const BASE = new URL('./', self.location.href);
 const CACHE_PREFIX = 'futari-shell-' + encodeURIComponent(BASE.pathname) + '-';
-const CACHE_NAME = CACHE_PREFIX + 'v3';
+const CACHE_NAME = CACHE_PREFIX + 'v4';
 const SHELL = [
   'index.html', 'app.js', 'home.js', 'games.js', 'board-games.js', 'config.js', 'pwa.js',
   'manifest.webmanifest', 'vendor/react.js', 'vendor/react-dom.js', 'vendor/supabase.js',
@@ -10,7 +10,7 @@ const SHELL = [
 ].map(path => new URL(path, BASE).href);
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL)));
+  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL.map(url => new Request(url, { cache: 'reload' })))));
   // Updates wait for old tabs to close; never force a reload during editing.
 });
 self.addEventListener('activate', event => {
@@ -29,8 +29,22 @@ self.addEventListener('fetch', event => {
   const key = navigation ? new URL('index.html', BASE).href : url.href;
   if (!navigation && !SHELL.includes(key)) return;
   event.respondWith(caches.open(CACHE_NAME).then(async cache => {
-    const cached = await cache.match(key);
-    return cached || fetch(request);
+    // Online visits revalidate files, even when a cache version was not bumped.
+    // Offline or failed deployments fall back to the last working response.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4000);
+    try {
+      const response = await fetch(request, { cache: 'no-cache', signal: controller.signal });
+      if (response.ok) {
+        try { await cache.put(key, response.clone()); } catch (error) { /* storage full: still show online response */ }
+        return response;
+      }
+      return (await cache.match(key)) || response;
+    } catch (error) {
+      const cached = await cache.match(key);
+      if (cached) return cached;
+      throw error;
+    } finally { clearTimeout(timer); }
   }));
 });
 

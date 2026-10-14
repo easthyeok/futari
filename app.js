@@ -581,6 +581,7 @@
     return h('div', null,
       h('h2', { className: 'title-xl', style: { marginBottom: 12 } }, '⚙️ 설정'),
       h('button', { className: 'btn ghost block', onClick: props.changeMember, style: { marginBottom: 12 } }, '이 기기의 사용자 바꾸기'),
+      h('a', { className: 'btn ghost block', href: './recover.html', style: { display: 'block', textAlign: 'center', textDecoration: 'none', marginBottom: 12 } }, '이전 화면이 보일 때 새로 받기'),
       h('div', { className: 'card' },
         h('p', { className: 'title-lg' }, '💑 우리 정보'),
         h('div', { className: 'row' },

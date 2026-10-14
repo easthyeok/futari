@@ -17,19 +17,20 @@ assert(manifest.icons.some(i=>i.purpose==='maskable'));
 async function worker(base) {
   const prefix = 'futari-shell-' + encodeURIComponent(new URL(base).pathname) + '-';
   const handlers = {}, stores = new Map([['unrelated-cache',new Map()], ['futari-shell-other-app-v1',new Map()], [prefix + 'old',new Map()]]);
-  let networkCalls=0, claimed=false, activations=0;
+  let networkCalls=0, claimed=false, activations=0, offline=true;
   const caches = {
     open:async name=>{
       if (!stores.has(name)) stores.set(name,new Map());
       const values=stores.get(name);
-      return {addAll:async urls=>{for(const url of urls){
+      return {addAll:async urls=>{for(let url of urls){
+        url = typeof url === 'string' ? url : url.url;
         const relative = new URL(url).pathname.slice(new URL(base).pathname.length);
         assert(fs.existsSync(path.join(root,relative)), `missing shell asset: ${relative}`);
         values.set(url, {asset:relative});
-      }}, match:async key=>values.get(key)};
+      }}, match:async key=>values.get(key), put:async(key,response)=>values.set(key,response)};
     }, keys:async()=>Array.from(stores.keys()), delete:async key=>stores.delete(key)
   };
-  const ctx = {URL, caches, self:{location:{href:new URL('sw.js',base).href}, clients:{claim:async()=>{claimed=true;}}, skipWaiting:async()=>{activations++;}, addEventListener:(type,fn)=>handlers[type]=fn}, fetch:()=>{networkCalls++; return Promise.reject(new Error('offline'));}};
+  const ctx = {URL, Request, AbortController, setTimeout, clearTimeout, caches, self:{location:{href:new URL('sw.js',base).href}, clients:{claim:async()=>{claimed=true;}}, skipWaiting:async()=>{activations++;}, addEventListener:(type,fn)=>handlers[type]=fn}, fetch:(request,options)=>{networkCalls++;assert.equal(options.cache,'no-cache');return offline ? Promise.reject(new Error('offline')) : Promise.resolve({ok:true,asset:'fresh',clone(){return this;}});}};
   vm.runInNewContext(fs.readFileSync(path.join(root,'sw.js'),'utf8'),ctx);
   let pending; handlers.install({waitUntil:p=>pending=p}); await pending;
   assert.equal(activations,0,'updates must not force activation during install');
@@ -46,8 +47,10 @@ async function worker(base) {
   assert.equal(trigger({url:'https://example.supabase.co/rest/v1/rooms',method:'GET',mode:'cors'}),undefined);
   assert.equal(trigger({url:new URL('app.js',base).href,method:'POST',mode:'cors'}),undefined);
   assert.equal(trigger({url:new URL('unknown',base).href,method:'GET',mode:'navigate'}),undefined);
-  assert.equal(networkCalls,0, 'offline shell should not need the network');
-  for(const key of stores.get(prefix + 'v3').keys()) assert(!new URL(key).search,'room links must not enter cache');
+  assert.equal(networkCalls,4, 'failed online checks must fall back to cached shell');
+  offline=false;assert.equal((await trigger({url:new URL('home.js',base).href,method:'GET',mode:'cors'})).asset,'fresh');
+  offline=true;assert.equal((await trigger({url:new URL('home.js',base).href,method:'GET',mode:'cors'})).asset,'fresh','offline fallback must retain the latest online file');
+  for(const key of stores.get(prefix + 'v4').keys()) assert(!new URL(key).search,'room links must not enter cache');
   const start=new URL(manifest.start_url,new URL('manifest.webmanifest',base));
   assert.equal(start.href,base); assert.equal(new URL(manifest.scope,base).href,base);
 }
