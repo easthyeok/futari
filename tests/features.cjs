@@ -3,10 +3,13 @@ let slots=[], cursor=0;
 const React={createElement:(type,props,...children)=>({type,props:props||{},children:children.flat(Infinity).filter(x=>x!==null&&x!==false&&x!==undefined)}),useState:init=>{const i=cursor++;if(!(i in slots))slots[i]=init;return [slots[i],v=>slots[i]=typeof v==='function'?v(slots[i]):v];},useEffect:()=>{},useRef:v=>({current:v}),useMemo:f=>f()};
 const context={window:{React,ReactDOM:{createRoot:()=>({render(){}})}},document:{getElementById:()=>({})},console,localStorage:{getItem:()=>null},alert:()=>{},confirm:()=>true,setTimeout,clearTimeout,setInterval,clearInterval};
 let src=fs.readFileSync(require('path').join(__dirname, '../app.js'),'utf8').replace('  try {\n    ReactDOM.createRoot', '  window.test = {TABS,TogetherPage,TimelinePage,CoupleCalendar,DateRoulette,freshData,todayStr,memoryPhotos};\n  try {\n    ReactDOM.createRoot');
+for(const file of ['data.js','activity.js'])vm.runInNewContext(fs.readFileSync(require('path').join(__dirname,'../'+file),'utf8'),context);
 vm.runInNewContext(fs.readFileSync(require('path').join(__dirname, '../home.js'),'utf8'),context);
 vm.runInNewContext(fs.readFileSync(require('path').join(__dirname, '../board-games.js'),'utf8'),context);
 vm.runInNewContext(fs.readFileSync(require('path').join(__dirname, '../farm.js'),'utf8'),context);
 vm.runInNewContext(fs.readFileSync(require('path').join(__dirname, '../today.js'),'utf8'),context);
+vm.runInNewContext(fs.readFileSync(require('path').join(__dirname,'../village.js'),'utf8'),context);
+vm.runInNewContext(fs.readFileSync(require('path').join(__dirname,'../calendar.js'),'utf8'),context);
 vm.runInNewContext(src,context); const api=context.window.test;
 function render(comp,props,reset=false){if(reset)slots=[];cursor=0;return comp(props);}
 function all(n,p){if(!n||typeof n!=='object')return [];return (p(n)?[n]:[]).concat(...n.children.map(x=>all(x,p)));}
@@ -20,10 +23,9 @@ button(t,'수정').props.onClick();t=render(api.TimelinePage,props);assert.equal
 all(t,x=>x.type==='input'&&x.props.placeholder==='어떤 추억인가요?')[0].props.onChange({target:{value:'제주 여행 수정'}});t=render(api.TimelinePage,props);button(t,'저장').props.onClick();assert.equal(data.memories[0].title,'제주 여행 수정');assert.equal(data.memories[0].photo,'data:old');assert.equal(data.memories.length,2);
 t=render(api.TimelinePage,props);button(t,'전체 보기').props.onClick();t=render(api.TimelinePage,props);button(t,'+ 추억 추가').props.onClick();t=render(api.TimelinePage,props);assert.equal(button(t,'저장').props.disabled,true);
 all(t,x=>x.type==='input'&&x.props.placeholder==='어떤 추억인가요?')[0].props.onChange({target:{value:'산책'}});t=render(api.TimelinePage,props);button(t,'저장').props.onClick();assert.equal(data.memories.length,3);assert.equal('photo' in data.memories[2],false);
-let selected; t=render(api.CoupleCalendar,{data,onAdd:d=>selected=d},true);assert(all(t,x=>x.props.className==='calendar-grid').length);button(t,'+ 이 날짜에 약속 추가').props.onClick();assert.equal(selected,api.todayStr());
-// Move across December/January and verify leap-year February.
-slots=['2028-02','2028-02-01'];t=render(api.CoupleCalendar,{data,onAdd:d=>selected=d});assert.equal(all(t,x=>x.type==='button'&&x.props['aria-pressed']!==undefined).length,29);
-slots=['2026-12','2026-12-01'];t=render(api.CoupleCalendar,{data,onAdd(){}});all(t,x=>x.props['aria-label']==='다음 달')[0].props.onClick();assert.equal(slots[0],'2027-01');
+let calendar=context.window.FutariCalendar.Calendar;t=render(calendar,{data,member:'me',update:f=>f(data)},true);assert(all(t,x=>x.props.className==='calendar-grid modern-calendar').length);button(t,'+ 일정').props.onClick();t=render(calendar,{data,member:'me',update:f=>f(data)});assert.equal(all(t,x=>x.props.type==='date')[0].props.value,context.window.FutariCalendar.today());all(t,x=>x.type==='input'&&x.props.maxLength===120)[0].props.onChange({target:{value:'우리 일정'}});t=render(calendar,{data,member:'me',update:f=>f(data)});const submit=all(t,x=>x.type==='form')[0].props.onSubmit,beforeSchedules=data.dates.length;submit({preventDefault(){}});submit({preventDefault(){}});assert.equal(data.dates.length,beforeSchedules+1,'double submit creates one schedule');
+slots=['2028-02-01','2028-02','month'];t=render(calendar,{data,member:'me',update:f=>f(data)});assert.equal(all(t,x=>x.type==='button'&&String(x.props.className||'').startsWith('calendar-day')).length,29);
+slots=['2026-12-01','2026-12','month'];t=render(calendar,{data,member:'me',update:f=>f(data)});all(t,x=>x.props['aria-label']==='다음 기간')[0].props.onClick();assert.equal(slots[1],'2027-01');
 data.buckets=[{text:'완료',category:'여행',done:true},{text:'카페',category:'먹기',done:false}];t=render(api.DateRoulette,{data},true);button(t,'데이트 뽑기').props.onClick();t=render(api.DateRoulette,{data});assert(text(t).includes('카페'));assert(!text(t).includes('완료'));
 t=render(api.DateRoulette,{data:{buckets:[]}},true);assert.equal(button(t,'데이트 뽑기').props.disabled,true);
 console.log('PASS: search, edit, legacy photo preservation, text-only creation, calendar selection/leap year/year transition, roulette and empty states');
@@ -61,7 +63,7 @@ let villageData=api.freshData(),nowDay=home.day();
 for(const who of ['me','you']){home.act(villageData,nowDay,who,'moods','😊');home.act(villageData,nowDay,who,'travel',1);home.act(villageData,nowDay,who,'food',2);home.act(villageData,nowDay,who,'notes','우리의 하루');}
 const villageProps={data:villageData,member:'me',update:f=>f(villageData)};
 let village=render(farm.FarmPage,villageProps,true);
-all(village,x=>x.props['aria-label']==='1번 자리 · 빈 땅')[0].props.onClick();village=render(farm.FarmPage,villageProps);button(village,'작은 텃밭 짓기 · 💛 12').props.onClick();assert.equal(villageData.farm.buildings[0],'garden');
+all(village,x=>x.type===context.window.FutariVillage.Village)[0].props.onPlot(0);village=render(farm.FarmPage,villageProps);button(village,'작은 텃밭 짓기 · 💛 12').props.onClick();assert.equal(villageData.farm.buildings[0],'garden');
 village=render(farm.FarmPage,villageProps);const radish=all(village,x=>x.type==='button'&&text(x).includes('래디시'))[0];assert(radish);radish.props.onClick();assert.equal(villageData.farm.crops[0].id,'radish');
 village=render(farm.FarmPage,villageProps);button(village,'물 주기 · 15초 단축').props.onClick();assert(villageData.farm.crops[0].watered.me);
 button(village,'🛋 집 안 꾸미기').props.onClick();village=render(farm.FarmPage,villageProps);assert(all(village,x=>x.type===home.Interior).length);

@@ -13,10 +13,11 @@
   /* ===== 저장소 ===== */
   var STORE_KEY = 'couple_timeline_v1';
   function freshData() {
-    return {
+    var starter = {
       settings: { me: '나', you: '너', startDate: '', anniversaries: [] },
       memories: [], places: [], buckets: [], dates: [], moods: [], polls: [], answers: {}, together: {}, house: { owned: [], equipped: {} }, boardGames: {}, gameResults: [], dodge: {}, farm: { level: 0, buildings: {}, crops: {}, seedSpent: 0, harvestCoins: 0, harvests: 0 },
     };
+    return window.FutariData?window.FutariData.migrate(starter):starter;
   }
   function normalizeData(raw) {
     var d = Object.assign(freshData(), raw || {});
@@ -27,7 +28,7 @@
     d.gameResults = d.gameResults || [];
     d.dodge = d.dodge || {};
     d.farm = d.farm || freshData().farm;
-    return d;
+    return window.FutariData ? window.FutariData.migrate(d) : d;
   }
   function loadData() {
     try {
@@ -49,7 +50,7 @@
       base.gameResults = p.gameResults || [];
       base.dodge = p.dodge || {};
       base.farm = p.farm || base.farm;
-      return base;
+      return normalizeData(p);
     } catch (e) { console.warn('load failed', e); return freshData(); }
   }
   function saveData(d) {
@@ -81,13 +82,14 @@
     catch (e) { console.warn('supabase init failed', e); return null; }
   }
 
+  function checkedRoom(raw,code){try{if(window.FutariData)window.FutariData.backup(localStorage,code,raw);return normalizeData(raw);}catch(e){e.migration=true;throw e;}}
   // 방 데이터 불러오기 (없으면 새로 만듦)
   function cloudLoad(code, acceptVersion) {
     var client = getSupabase();
     if (!client) return Promise.reject(new Error('Supabase 미설정'));
     return client.from('rooms').select('data,updated_at').eq('code', code).maybeSingle().then(function (res) {
       if (res.error) throw res.error;
-      if (res.data && res.data.data) { if (!acceptVersion || acceptVersion(res.data.updated_at)) roomVersions[code] = res.data.updated_at; return normalizeData(res.data.data); }
+      if (res.data && res.data.data) { var normalized=checkedRoom(res.data.data,code); if (!acceptVersion || acceptVersion(res.data.updated_at)) roomVersions[code] = res.data.updated_at; return normalized; }
       // 방이 없으면 빈 데이터로 생성
       return client.from('rooms').insert({ code: code, data: freshData(), updated_at: new Date().toISOString() }).select('updated_at').single().then(function (created) { if (created.error) throw created.error; if (!acceptVersion || acceptVersion(created.data.updated_at)) roomVersions[code] = created.data.updated_at; return freshData(); });
     });
@@ -108,6 +110,13 @@
     });
   }
 
+  function cloudCommit(code,data,version){
+    var client=getSupabase();if(!client)return Promise.reject(new Error('Supabase 미설정'));
+    var stamp=new Date().toISOString().replace('Z',String(Math.floor(Math.random()*1000)).padStart(3,'0')+'Z');
+    var q=client.from('rooms').update({data:data,updated_at:stamp}).eq('code',code);
+    q=version==null?q.is('updated_at',null):q.eq('updated_at',version);
+    return q.select('updated_at').then(function(res){if(res.error)throw res.error;if(!res.data||!res.data.length){var e=Error('저장 버전 변경');e.cas=true;throw e;}roomVersions[code]=res.data[0].updated_at;return{version:res.data[0].updated_at};});
+  }
   /* ===== 날짜 ===== */
   function todayStr() { return localDate(new Date()); }
   function daysBetween(a, b) {
@@ -288,28 +297,7 @@
         h('div', { className: 'row' }, h('button', { className: 'btn ghost', disabled: viewing.index === 0, onClick: function () { setViewing(Object.assign({}, viewing, { index: viewing.index - 1 })); } }, '이전'), h('button', { className: 'btn gray', onClick: function () { setViewing(null); } }, '닫기'), h('button', { className: 'btn ghost', disabled: viewing.index === viewing.photos.length - 1, onClick: function () { setViewing(Object.assign({}, viewing, { index: viewing.index + 1 })); } }, '다음'))) : null);
   }
 
-  function CoupleCalendar(props) {
-    var state = useState(todayStr().slice(0, 7)), month = state[0], setMonth = state[1];
-    var ss = useState(todayStr()), selected = ss[0], setSelected = ss[1];
-    var parts = month.split('-').map(Number), year = parts[0], mo = parts[1] - 1;
-    var start = new Date(year, mo, 1).getDay(), count = new Date(year, mo + 1, 0).getDate();
-    var events = props.data.dates.map(function (x) { return { date: x.date, title: '📅 ' + x.title }; }).concat(props.data.memories.map(function (x) { return { date: x.date, title: '📖 ' + x.title }; }));
-    props.data.settings.anniversaries.forEach(function (x) { events.push({ date: year + x.date.slice(4), title: '🎉 ' + x.name }); });
-    if (props.data.settings.startDate) events.push({ date: year + props.data.settings.startDate.slice(4), title: '💕 만난 날' });
-    function move(offset) { var d = new Date(year, mo + offset, 1); setMonth(localDate(d).slice(0, 7)); setSelected(localDate(d)); }
-    var cells = Array.from({ length: start }, function (_, i) { return h('span', { key: 'blank' + i }); });
-    for (var day = 1; day <= count; day++) {
-      (function (date, number) {
-        var has = events.some(function (x) { return x.date === date; });
-        cells.push(h('button', { key: date, className: 'calendar-day' + (selected === date ? ' selected' : '') + (date === todayStr() ? ' today' : ''), 'aria-label': date + (has ? ' 기록 있음' : ''), 'aria-pressed': selected === date, onClick: function () { setSelected(date); } }, number, h('span', { className: 'event-dot' }, has ? '●' : '')));
-      })(localDate(new Date(year, mo, day)), day);
-    }
-    var daily = events.filter(function (x) { return x.date === selected; });
-    return h('section', { className: 'card' }, h('div', { className: 'row', style: { alignItems: 'center' } }, h('button', { className: 'btn ghost sm', 'aria-label': '이전 달', onClick: function () { move(-1); } }, '‹'), h('strong', { className: 'center' }, year + '년 ' + (mo + 1) + '월'), h('button', { className: 'btn ghost sm', 'aria-label': '다음 달', onClick: function () { move(1); } }, '›')),
-      h('div', { className: 'calendar-grid' }, ['일', '월', '화', '수', '목', '금', '토'].map(function (x) { return h('span', { key: x, className: 'center muted' }, x); }), cells),
-      h('p', { className: 'when' }, fmtK(selected)), daily.length ? daily.map(function (x, i) { return h('p', { key: i, className: 'm' }, x.title); }) : h('p', { className: 'muted' }, '이날은 아직 기록이 없어요.'),
-      h('button', { className: 'btn ghost block', onClick: function () { props.onAdd(selected); } }, '+ 이 날짜에 약속 추가'));
-  }
+  function CoupleCalendar(props) { return h(window.FutariCalendar.Calendar,props); }
 
   function DateRoulette(props) {
     var rs = useState(''), result = rs[0], setResult = rs[1];
@@ -325,6 +313,7 @@
 
   /* ===== 버킷리스트 ===== */
   function BucketPage(props) {
+    var formId=useRef(uid());
     var data = props.data, update = props.update;
     var openState = useState(false), open = openState[0], setOpen = openState[1];
     var textState = useState(''), text = textState[0], setText = textState[1];
@@ -335,7 +324,7 @@
 
     function add() {
       if (!text.trim()) return;
-      update(function (d) { d.buckets.push({ id: uid(), text: text, category: category, done: false }); });
+      update(function (d) { if(!d.buckets.some(function(b){return b.id===formId.current;}))d.buckets.push({ id: formId.current, text: text, category: category, done: false }); });
       setText(''); setOpen(false);
     }
     function toggle(id) { update(function (d) { var b = d.buckets.find(function (x) { return x.id === id; }); if (b) b.done = !b.done; }); }
@@ -352,7 +341,7 @@
     return h('div', null,
       h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 } },
         h('h2', { className: 'title-xl' }, '⭐ 버킷리스트'),
-        h('button', { className: 'btn sm', onClick: function () { setOpen(true); } }, '+ 추가')),
+        h('button', { className: 'btn sm', onClick: function () { formId.current=uid();setOpen(true); } }, '+ 추가')),
       h('div', { className: 'card' },
         h('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: 6 } },
           h('span', { style: { fontWeight: 700 } }, '달성률'),
@@ -369,6 +358,7 @@
               return h('div', { key: b.id, className: 'item', style: { display: 'flex', alignItems: 'center', gap: 10 } },
                 h('input', { type: 'checkbox', style: { width: 22, flex: 'none' }, checked: b.done, onChange: function () { toggle(b.id); } }),
                 h('span', { style: { flex: 1, textDecoration: b.done ? 'line-through' : 'none', color: b.done ? '#bba' : '#3a2b33' } }, b.text),
+                h('button',{className:'btn ghost sm',onClick:function(){var day=prompt('언제로 정할까요? YYYY-MM-DD',todayStr());if(!window.FutariCalendar.valid(day))return;update(function(d){var item=d.buckets.find(function(v){return v.id===b.id;});if(!item||item.calendarId)return;item.calendarId=uid();d.dates.push({id:item.calendarId,date:day,title:item.text,memo:'위시리스트에서 만든 일정',kind:item.category==='여행'?'travel':'date',allDay:true,status:'accepted',owner:props.member});});}},'날짜 정하기'),
                 b.done && !b.memoryId ? h('button', { className: 'btn ghost sm', style: { flex: 'none' }, onClick: function () { toMemory(b); } }, '추억으로') : null,
                 h('span', { className: 'link', style: { flex: 'none' }, onClick: function () { del(b.id); } }, '✕'));
             }));
@@ -388,67 +378,7 @@
   }
 
   /* ===== 약속 ===== */
-  function DatePlanPage(props) {
-    var data = props.data, update = props.update;
-    var openState = useState(false), open = openState[0], setOpen = openState[1];
-    var formState = useState({ date: todayStr(), title: '', memo: '' }), form = formState[0], setForm = formState[1];
-    var tabState = useState('up'), tab = tabState[0], setTab = tabState[1];
-    var today = todayStr();
-    var upcoming = data.dates.filter(function (d) { return !d.done; }).sort(function (a, b) { return a.date > b.date ? 1 : -1; });
-    var doneList = data.dates.filter(function (d) { return d.done; }).sort(function (a, b) { return b.date > a.date ? 1 : -1; });
-
-    function add() {
-      if (!form.title.trim()) { alert('제목을 입력해주세요.'); return; }
-      update(function (d) { d.dates.push(Object.assign({ id: uid() }, form, { done: false })); });
-      setForm({ date: todayStr(), title: '', memo: '' }); setOpen(false);
-    }
-    function complete(id) { update(function (d) { var x = d.dates.find(function (v) { return v.id === id; }); if (x) { x.done = true; if (!x.memoryId) { x.memoryId = uid(); d.memories.push({ id: x.memoryId, date: x.date, title: '📅 ' + x.title, memo: x.memo || '', sourceId: x.id }); } } }); }
-    function del(id) { if (confirm('삭제할까요?')) update(function (d) { d.dates = d.dates.filter(function (v) { return v.id !== id; }); }); }
-    function toMemory(x) {
-      if (x.memoryId || !confirm('이 약속을 추억으로 보낼까요?')) return;
-      update(function (d) { var item = d.dates.find(function (v) { return v.id === x.id; }); if (!item || item.memoryId) return; item.memoryId = uid(); d.memories.push({ id: item.memoryId, date: x.date, title: '📅 ' + x.title, memo: x.memo || '' }); });
-      alert('추억 탭에 저장했어요 💕');
-    }
-    var list = tab === 'up' ? upcoming : doneList;
-
-    return h('div', null,
-      h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 } },
-        h('h2', { className: 'title-xl' }, '📅 커플 캘린더'),
-        h('button', { className: 'btn sm', onClick: function () { setOpen(true); } }, '+ 추가')),
-      h(CoupleCalendar, { data: data, onAdd: function (date) { setForm({ date: date, title: '', memo: '' }); setOpen(true); } }),
-      h('div', { className: 'seg' },
-        h('button', { className: tab === 'up' ? 'on' : '', onClick: function () { setTab('up'); } }, '예정 (' + upcoming.length + ')'),
-        h('button', { className: tab === 'done' ? 'on' : '', onClick: function () { setTab('done'); } }, '완료 (' + doneList.length + ')')),
-      list.length === 0
-        ? h('div', { className: 'empty' }, tab === 'up' ? '다음 데이트를 계획해봐요 🗓️' : '완료된 약속이 없어요.')
-        : list.map(function (x) {
-          var left = daysBetween(today, x.date);
-          var past = left < 0 && !x.done;
-          return h('div', { key: x.id, className: 'item' },
-            h('div', { style: { display: 'flex', justifyContent: 'space-between' } },
-              h('span', { className: 'when' }, fmtK(x.date)),
-              !x.done ? (left === 0 ? h('span', { className: 'pill pink' }, '오늘!') : left > 0 ? h('span', { className: 'pill pink' }, 'D-' + left) : h('span', { className: 'pill gray' }, '지남')) : null),
-            h('div', { className: 't', style: { color: past ? '#c99' : '#3a2b33' } }, x.title),
-            x.memo ? h('div', { className: 'm' }, x.memo) : null,
-            h('div', { style: { textAlign: 'right', marginTop: 6, display: 'flex', gap: 8, justifyContent: 'flex-end' } },
-              !x.done ? h('button', { className: 'btn ghost sm', onClick: function () { complete(x.id); } }, '완료') : null,
-              x.done && !x.memoryId ? h('button', { className: 'btn ghost sm', onClick: function () { toMemory(x); } }, '추억으로') : null,
-              h('span', { className: 'link', onClick: function () { del(x.id); } }, '삭제')));
-        }),
-      open ? h(Modal, { onClose: function () { setOpen(false); } },
-        h('p', { className: 'title-lg' }, '데이트 약속 추가'),
-        h('label', null, '날짜'),
-        h('input', { type: 'date', value: form.date, onChange: function (e) { setForm(Object.assign({}, form, { date: e.target.value })); } }),
-        h('label', null, '제목'),
-        h('input', { placeholder: '예: 영화 보기 🎬', value: form.title, onChange: function (e) { setForm(Object.assign({}, form, { title: e.target.value })); } }),
-        h('label', null, '메모'),
-        h('textarea', { placeholder: '장소, 시간 등', value: form.memo, onChange: function (e) { setForm(Object.assign({}, form, { memo: e.target.value })); } }),
-        h('div', { className: 'row', style: { marginTop: 14 } },
-          h('button', { className: 'btn gray', onClick: function () { setOpen(false); } }, '취소'),
-          h('button', { className: 'btn', onClick: add }, '추가'))
-      ) : null
-    );
-  }
+  function DatePlanPage(props) { return h(window.FutariCalendar.Calendar,props); }
 
   /* ===== 놀이 ===== */
   function PlayPage(props) {
@@ -627,6 +557,7 @@
       h('div', { className: 'card' },
         h('p', { className: 'title-lg' }, '⚠️ 초기화'),
         h('button', { className: 'btn gray block', style: { color: '#c0392b' }, onClick: resetAll }, '모든 데이터 삭제')),
+      h('section',{className:'card'},h('h2',{className:'title-lg'},'복구용 백업'),h('p',{className:'muted'},'버전 변경 전 데이터와 충돌 시 보관한 변경을 내려받을 수 있어요. 파일을 보관한 뒤 백업 가져오기로 복원해주세요.'),Object.keys(localStorage).filter(function(k){return k.indexOf('futari_backup_')===0&&(k.endsWith('_'+props.room)||k.endsWith('_'+props.room+'_local'))||k==='futari_conflict_backup_'+props.room;}).map(function(k){return h('button',{key:k,className:'btn ghost block',onClick:function(){var saved=JSON.parse(localStorage.getItem(k)),blob=new Blob([JSON.stringify(saved.data,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=k+'.json';a.click();URL.revokeObjectURL(url);}},k.indexOf('conflict')>=0?'미저장 변경 백업 내려받기':'버전 변경 전 백업 내려받기');}),h('p',{className:'muted'},'방 코드를 아는 사람이 입장할 수 있어요. 두 사람만 아는 코드를 사용해주세요.')),
       h('p', { className: 'muted center', style: { marginTop: 10 } }, 'futari 💪 v1')
     );
   }
@@ -634,6 +565,7 @@
   /* ===== 메인 App ===== */
   function TogetherPage(props) {
     var state = useState('date'), section = state[0], setSection = state[1];
+    useEffect(function(){if(props.target&&(props.data.buckets||[]).some(function(b){return b.id===props.target;}))setSection('bucket');else if(props.target)setSection('date');},[props.target]);
     var options = [['date', '📅 약속', DatePlanPage], ['bucket', '⭐ 하고 싶은 일', BucketPage]];
     return h('div', null, h('div', { className: 'seg' }, options.map(function (x) { return h('button', { key: x[0], className: section === x[0] ? 'on' : '', onClick: function () { setSection(x[0]); } }, x[1]); })), h(options.find(function (x) { return x[0] === section; })[2], props));
   }
@@ -688,83 +620,39 @@
   function App() {
     var identityState = useState(''), identity = identityState[0], setIdentity = identityState[1];
     var roomState = useState(getRoomCode()), room = roomState[0], setRoom = roomState[1];
-    var dataState = useState(function () { var cached = cachedRoom(getRoomCode()); return cached && cached.data ? normalizeData(cached.data) : null; }), data = dataState[0], setData = dataState[1];
+    var dataState = useState(function () { var cached = cachedRoom(getRoomCode());try{return cached&&cached.data?checkedRoom(cached.data,getRoomCode()+'_local'):null;}catch(e){return null;} }), data = dataState[0], setData = dataState[1];
     var tabState = useState('home'), tab = tabState[0], setTab = tabState[1];
     var loadingState = useState(!!getRoomCode() && !cachedRoom(getRoomCode())), loading = loadingState[0], setLoading = loadingState[1];
     var syncState = useState(''), syncMsg = syncState[0], setSyncMsg = syncState[1];
-    var saveTimer = useRef(null), immediateSave = useRef(false);
-    var dirty = useRef(!!(cachedRoom(getRoomCode()) || {}).pending), revision = useRef(0), saveQueue = useRef(Promise.resolve());
-    var retryState = useState(0), retry = retryState[0], setRetry = retryState[1];
-    useEffect(function () { if (!document.body) return; document.body.classList.toggle('game-mode', tab === 'games'); document.body.classList.toggle('farm-mode', tab === 'home' || tab === 'today'); return function () { document.body.classList.remove('game-mode'); document.body.classList.remove('farm-mode'); }; }, [tab]);
-    var skipSave = useRef(true); // 최초 로드 직후 저장 방지
-
-    // 기존 방 코드가 있으면 자동으로 클라우드 로드
-    useEffect(function () {
-      if (!room) return;
-      var initialRevision = revision.current;
-      cloudLoad(room, function () { return initialRevision === revision.current && !dirty.current; }).then(function (d) {
-        skipSave.current = true;
-        var cached = cachedRoom(room);
-        if (cached && cached.pending) { if (Object.prototype.hasOwnProperty.call(cached, 'version')) roomVersions[room] = cached.version; else delete roomVersions[room]; dirty.current = true; setData(normalizeData(cached.data)); skipSave.current = false; }
-        else if (initialRevision === revision.current) { setData(d); cacheRoom(room, d, false); }
-        setLoading(false);
-      }).catch(function (e) {
-        console.error(e);
-        setSyncMsg('연결 실패 — 방 코드를 다시 확인해주세요');
-        setLoading(false);
-      });
-    }, []);
-
-    // 저장을 순서대로 처리하고 실패한 변경은 원격 조회로 덮어쓰지 않는다.
-    useEffect(function () {
-      if (data == null || !room) return;
-      if (skipSave.current) { skipSave.current = false; return; }
-      dirty.current = true;
-      var version = ++revision.current, cancelled = false;
-      setSyncMsg('저장 중…');
-      var saveDelay = immediateSave.current ? 0 : 1200; immediateSave.current = false;
-      saveTimer.current = setTimeout(function () {
-        saveTimer.current = null;
-        saveQueue.current = saveQueue.current.catch(function () {}).then(function () {
-          if (cancelled) return;
-          return cloudSave(room, data).then(function () {
-            if (cancelled || version !== revision.current) return;
-            dirty.current = false; cacheRoom(room, data, false); setSyncMsg('저장됨 ✓');
-          }).catch(function (e) {
-            console.error(e);
-            if (!cancelled && version === revision.current) setSyncMsg('저장 실패 · ' + e.message + ' · 눌러서 다시 시도');
-          });
-        });
-      }, saveDelay);
-      return function () { cancelled = true; if (saveTimer.current) clearTimeout(saveTimer.current); saveTimer.current = null; };
-    }, [data, room, retry]);
-
-    useEffect(function () {
-      if (!room || data == null) return;
-      var active = true;
-      function refresh() {
-        if (dirty.current) return;
-        var version = revision.current;
-        cloudLoad(room, function () { return active && !dirty.current && version === revision.current; }).then(function (remote) {
-          if (active && !dirty.current && version === revision.current && JSON.stringify(remote) !== JSON.stringify(data)) {
-            skipSave.current = true; setData(remote); cacheRoom(room, remote, false);
-          }
-        }).catch(function () {});
-      }
-      var iv = setInterval(refresh, tab === 'games' ? 2500 : 10000);
-      function onVisible() { if (document.visibilityState === 'visible') refresh(); }
-      window.addEventListener('focus', refresh); document.addEventListener('visibilitychange', onVisible);
-      return function () { active = false; clearInterval(iv); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', onVisible); };
-    }, [room, data, tab]);
-
-    function update(mutator, immediate) { if (immediate) immediateSave.current = true; dirty.current = true; revision.current++; setData(function (prev) { var next = clone(prev); mutator(next); cacheRoom(room, next, true); return next; }); }
-    function recoverRemote() {
-      if (!confirm('이 기기의 미저장 변경을 버리고 상대가 저장한 내용을 불러올까요? 필요한 기록은 먼저 설정에서 백업해주세요.')) return;
-      revision.current++;
-      if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
-      saveQueue.current.catch(function () {}).then(function () { return cloudLoad(room); }).then(function (remote) { dirty.current = false; skipSave.current = true; setData(remote); cacheRoom(room, remote, false); setSyncMsg('상대 변경을 불러왔어요'); }).catch(function () { setSyncMsg('저장 실패 · 다시 연결한 후 시도해주세요'); });
+    var sessionRef=useRef(null),confirmedState=useState(null),confirmed=confirmedState[0],setConfirmed=confirmedState[1];
+    var dirty=useRef(!!(cachedRoom(getRoomCode())||{}).pending),revision=useRef(0),skipSave=useRef(true);
+    var notificationState=useState(false),notifications=notificationState[0],setNotifications=notificationState[1];
+    var targetState=useState(null),target=targetState[0],setTarget=targetState[1];
+    var summaryState=useState(true),showSummary=summaryState[0],setShowSummary=summaryState[1];
+    function currentIdentity(){if(identity)return identity;try{return localStorage.getItem('futari_identity_'+room)||'';}catch(e){return '';}}
+    useEffect(function(){if(!document.body)return;document.body.classList.toggle('game-mode',tab==='games');document.body.classList.toggle('farm-mode',tab==='home'||tab==='today');return function(){document.body.classList.remove('game-mode','farm-mode');};},[tab]);
+    useEffect(function(){
+      if(!room)return;
+      var cached=cachedRoom(room);try{if(cached&&cached.data)checkedRoom(cached.data,room+'_local');}catch(e){setSyncMsg('마이그레이션 중단 · '+e.message);setLoading(false);return;}
+      var session=new window.FutariSync.Session({room:room,cached:cachedRoom(room),load:function(){return cloudLoad(room).then(function(d){return{data:d,version:roomVersions[room]};});},save:function(d,v){return cloudCommit(room,d,v);},persist:function(snapshot){localStorage.setItem('futari_cache_'+room,JSON.stringify(snapshot));},onChange:function(d,ack,message,pending){if(d)setData(d);if(ack)setConfirmed(ack);dirty.current=pending;setSyncMsg(message);setLoading(false);}});
+      sessionRef.current=session;session.open();
+      var client=getSupabase(),channel=null;
+      function refresh(){if(document.visibilityState!=='hidden')session.refresh();}
+      if(client&&client.channel){channel=client.channel('futari-'+room).on('postgres_changes',{event:'*',schema:'public',table:'rooms',filter:'code=eq.'+room},refresh).subscribe(function(status){if(status==='SUBSCRIBED')refresh();});}
+      function due(){if(!session.data||!window.FutariContent)return;var list=window.FutariContent.due(session.data,currentIdentity(),Date.now());if(list.length)session.change(function(d){var known=new Set(d.activities.map(function(e){return e.id;}));list.forEach(function(e){if(!known.has(e.id))d.activities.push(e);});},null);}
+      var reminderTimer=setInterval(due,30000);
+      var poll=setInterval(refresh,5000);window.addEventListener('online',refresh);window.addEventListener('focus',refresh);document.addEventListener('visibilitychange',refresh);
+      return function(){session.close();if(sessionRef.current===session)sessionRef.current=null;clearInterval(poll);clearInterval(reminderTimer);if(channel)client.removeChannel(channel);window.removeEventListener('online',refresh);window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);};
+    },[room]);
+    function update(mutator){if(sessionRef.current&&sessionRef.current.o.room===room)sessionRef.current.change(mutator,currentIdentity());}
+    function retrySave(){if(sessionRef.current)sessionRef.current.flush();}
+    function recoverRemote(){
+      if(!confirm('미저장 변경을 백업하고 상대 변경을 불러올까요?'))return;
+      var session=sessionRef.current;if(!session)return;
+      try{localStorage.setItem('futari_conflict_backup_'+room,JSON.stringify({savedAt:new Date().toISOString(),data:session.data,base:session.base,outbox:session.outbox}));}catch(e){setSyncMsg('백업 실패 · 저장 공간을 확인해주세요');return;}
+      session.dirty=false;session.outbox=[];session.refresh();
     }
-    function onEnter(code, loaded) { dirty.current = false; setSyncMsg(''); setRoom(code); skipSave.current = true; setData(loaded); cacheRoom(code, loaded, false); setLoading(false); }
+    function onEnter(code, loaded) { dirty.current = false; setSyncMsg(''); setRoom(code); skipSave.current = true; setData(loaded); cacheRoom(code, loaded, false); setLoading(false);setConfirmed(null);setShowSummary(true); }
     function leaveRoom() {
       if (!confirm(dirty.current ? '아직 저장하지 못한 변경이 있어요. 그래도 방을 나갈까요?' : '이 기기에서 방을 나갈까요? (데이터는 클라우드에 남아있어요)')) return;
       dirty.current = false; revision.current++;
@@ -778,23 +666,26 @@
       return h('div', { className: 'app' },
         h('div', { className: 'hero' }, h('div', { className: 'names' }, 'futari 💪'), h('div', { className: 'sub', style: { marginTop: 8 } }, '불러오는 중…')),
         syncMsg ? h('div', { className: 'card' }, h('p', { className: 'muted center' }, syncMsg),
-          h('button', { className: 'btn ghost block', style: { marginTop: 8 }, onClick: leaveRoom }, '방 코드 다시 입력')) : null);
+          h('button', { className: 'btn ghost block', style: { marginTop: 8 }, onClick: leaveRoom }, '방 코드 다시 입력'),cachedRoom(room)?h('button',{className:'btn ghost block',onClick:function(){var raw=cachedRoom(room),blob=new Blob([JSON.stringify(raw.data,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='futari_recovery_backup.json';a.click();URL.revokeObjectURL(url);}},'기기에 남은 데이터 백업'):null) : null);
     }
 
     function chooseIdentity(who) { try { localStorage.setItem('futari_identity_' + room, who); } catch (e) {} setIdentity(who); }
     var member = identity;
     if (!member) { try { member = localStorage.getItem('futari_identity_' + room) || ''; } catch (e) {} }
     if (member !== 'me' && member !== 'you') return h('div', { className: 'app' }, h('div', { className: 'card' }, h('h1', { className: 'title-xl' }, '이 기기는 누가 사용하나요?'), h('p', { className: 'muted' }, '각자 자신의 이름을 골라주세요. 다음부터는 기억할게요.'), h('div', { className: 'row' }, ['me', 'you'].map(function (who) { return h('button', { key: who, className: 'btn', onClick: function () { chooseIdentity(who); } }, data.settings[who]); }))));
-    var pageProps = { gameSaving: dirty.current, gameSyncMessage: syncMsg, retryGameSave: function () { setRetry(function (n) { return n + 1; }); }, member: member, changeMember: function () { try { localStorage.removeItem('futari_identity_' + room); } catch (e) {} setIdentity(''); }, data: data, update: update, updateGame: function (mutator) { update(mutator, true); }, setData: function (replacement) { dirty.current = true; revision.current++; cacheRoom(room, replacement, true); setData(replacement); }, room: room, leaveRoom: leaveRoom };
-    var current = tab === 'settings' ? { comp: SettingsPage } : TABS.find(function (t) { return t.id === tab; });
+    var pageProps = { gameSaving: dirty.current, gameSyncMessage: syncMsg, retryGameSave: retrySave, member: member, changeMember: function () { try { localStorage.removeItem('futari_identity_' + room); } catch (e) {} setIdentity(''); }, data: data, confirmed:confirmed||{}, navigate:navigate, target:target, update: update, updateGame: function (mutator) { update(mutator, true); }, setData: function(replacement){update(function(d){var ledger=d.commits||{};Object.keys(d).forEach(function(k){delete d[k];});Object.assign(d,replacement);d.commits=Object.assign({},ledger,d.commits||{});});}, room: room, leaveRoom: leaveRoom };
+    function navigate(next,id){setNotifications(false);setTarget(id||null);setTab(next==='mail'||next==='catalog'?next:next);window.scrollTo(0,0);}
+    var unread=window.FutariActivity.unread(confirmed||{},member);
+    var current = tab === 'settings' ? { comp: SettingsPage } : tab==='mail'?{comp:window.FutariContent.Mailbox}:tab==='catalog'?{comp:window.FutariContent.Catalog}:TABS.find(function(t){return t.id===tab;})||TABS[0];
 
     return h('div', { className: 'app' + (tab === 'games' ? ' game-app' : '') },
-      syncMsg ? h('button', { type: 'button', onClick: function () { if (syncMsg.indexOf('저장 실패') === 0) setRetry(function (n) { return n + 1; }); }, style: { border: 0, cursor: 'pointer', position: 'fixed', top: 8, left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,.65)', color: '#fff', padding: '4px 12px', borderRadius: 999, fontSize: 12, zIndex: 3000 } }, syncMsg) : null,
-      h('div', { className: 'app-toolbar' }, h('span', null, data.settings[member] + '의 공간'), h('button', { className: 'btn ghost sm', onClick: function () { setTab(tab === 'settings' ? 'home' : 'settings'); } }, tab === 'settings' ? '마을로' : '⚙ 설정')),
+      syncMsg ? h('button', { type: 'button', onClick: function () { if (syncMsg.indexOf('저장 실패') === 0) retrySave(); }, style: { border: 0, cursor: 'pointer', position: 'fixed', top: 8, left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,.65)', color: '#fff', padding: '4px 12px', borderRadius: 999, fontSize: 12, zIndex: 3000 } }, syncMsg) : null,
+      h('div',{className:'app-toolbar'},h('span',null,data.settings[member]+'의 공간'),h('div',{className:'toolbar-actions'},h('button',{className:'toolbar-icon','aria-label':'우편함',onClick:function(){navigate('mail');}},'✉'),h('button',{className:'toolbar-icon','aria-label':'추억 도감',onClick:function(){navigate('catalog');}},'▦'),h('button',{className:'toolbar-icon','aria-label':'알림 '+unread.length+'개',onClick:function(){setNotifications(!notifications);setShowSummary(false);}},h('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:1.8,'aria-hidden':true},h('path',{d:'M 5 17h14l-2-3V9a5 5 0 0 0-10 0v5l-2 3z M 10 20h4 M 12 2v2'})),unread.length?h('span',{className:'notification-count'},unread.length>99?'99+':unread.length):null),h('button',{className:'btn ghost sm',onClick:function(){setTab(tab==='settings'?'home':'settings');}},'⚙'))),
+      showSummary&&unread.length?h('div',{className:'activity-summary',role:'status'},h('button',{onClick:function(){setNotifications(true);setShowSummary(false);}},'새 소식 '+unread.length+'개 · 상대의 하루를 확인해요'),h('button',{'aria-label':'새 소식 요약 닫기',onClick:function(){setShowSummary(false);}},'×')):null,
       syncMsg.indexOf('저장 실패') === 0 || syncMsg.indexOf('연결 실패') === 0 ? h('div', { className: 'card', role: 'alert' }, h('p', { className: 'muted' }, '현재 화면의 변경은 이 기기에 보관되어 있어요. 필요한 내용을 설정에서 백업한 뒤 상대 변경을 불러올 수 있어요.'), h('button', { className: 'btn ghost block', onClick: recoverRemote }, '상대 변경 불러오기')) : null,
-      h(current.comp, pageProps),
+      notifications?h(window.FutariActivity.Center,pageProps):h(current.comp,pageProps),
       h('nav', { className: 'tabbar' }, TABS.map(function (t) {
-        return h('button', { key: t.id, className: 'tab' + (tab === t.id ? ' active' : ''), onClick: function () { setTab(t.id); window.scrollTo(0, 0); } },
+        return h('button', { key: t.id, className: 'tab' + (tab === t.id ? ' active' : ''), onClick: function () { navigate(t.id); } },
           h('span', { className: 'ico' }, t.ico), h('span', null, t.label));
       }))
     );

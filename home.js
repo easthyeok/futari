@@ -40,8 +40,9 @@
     {id:'wood',slot:'floor',name:'짙은 나무 바닥',icon:'🪵',cost:30,color:'#b98d6c'},
     {id:'cream',slot:'floor',name:'크림 바닥',icon:'🤍',cost:30,color:'#eee1ca'}
   ];
+  if(window.FutariInterior) ITEMS=ITEMS.concat(window.FutariInterior.newItems);
   function earned(d) {
-    var total = growth(d) * 3;
+    var total = growth(d) * 3 + (window.FutariContent?window.FutariContent.bonus(d):0);
     Object.keys(d.together || {}).forEach(function(date) {
       var e = d.together[date];
       if (e.moods && e.moods.me && e.moods.you && ((e.choices && e.choices.me !== undefined && e.choices.you !== undefined && e.activity && e.activity.me && e.activity.you) || ['travel','food','notes'].every(function(k){return e[k]&&e[k].me!==undefined&&e[k].you!==undefined;}))) total += 12;
@@ -65,7 +66,7 @@
     var d=props.data, state=window.React.useState('all'), filter=state[0],setFilter=state[1], eq=(d.house||{}).equipped||{}, money=balance(d);
     return h('section',{className:'card decor-shop'},h('div',{className:'shop-heading'},h('div',null,h('span',{className:'eyebrow'},'LITTLE HOME SHOP'),h('h2',{className:'title-lg'},'같이 고르는 우리 집')),h('strong',{className:'coin-badge','aria-label':'사용 가능한 마음 코인'},'💛 '+money)),h('p',{className:'muted'},'구매하면 바로 집에 놓여요. 가진 물건은 언제든 바꿔 꾸밀 수 있어요.'),
       h('div',{className:'shop-filters'},[['all','전체'],['owned','보관함'],['wall','벽지'],['floor','바닥']].map(function(v){return h('button',{key:v[0],className:'btn ghost sm','aria-pressed':filter===v[0],onClick:function(){setFilter(v[0]);}},v[1]);})),
-      h('div',{className:'furniture-grid'},ITEMS.filter(function(i){return filter==='all'||filter==='owned'&&owned(d).indexOf(i.id)>=0||i.slot===filter;}).map(function(item){var has=owned(d).indexOf(item.id)>=0,on=eq[item.slot]===item.id;return h('article',{key:item.id,className:'furniture'+(on?' equipped':'')},h('span',{className:'furniture-icon','aria-hidden':true},item.icon),h('strong',null,item.name),h('small',null,has?'우리의 물건':'💛 '+item.cost),h('button',{className:'btn ghost sm',disabled:!has&&money<item.cost,onClick:function(){props.update(function(next){decorate(next,item.id);});}},on?'치우기':has?'배치하기':money<item.cost?(item.cost-money)+' 코인 더 모으기':'구매 · 배치'));})),filter==='owned'&&!owned(d).length?h('p',{className:'muted'},'첫 가구를 골라볼까요? 기분을 남기면 3 코인이 쌓여요.'):null);
+      h('div',{className:'furniture-grid'},ITEMS.filter(function(i){return i.slot&&(!props.surfacesOnly||i.slot==='wall'||i.slot==='floor');}).filter(function(i){return filter==='all'||filter==='owned'&&owned(d).indexOf(i.id)>=0||i.slot===filter;}).map(function(item){var has=owned(d).indexOf(item.id)>=0,on=eq[item.slot]===item.id;return h('article',{key:item.id,className:'furniture'+(on?' equipped':'')},h('span',{className:'furniture-icon','aria-hidden':true},item.icon),h('strong',null,item.name),h('small',null,has?'우리의 물건':'💛 '+item.cost),h('button',{className:'btn ghost sm',disabled:!has&&money<item.cost,onClick:function(){props.update(function(next){decorate(next,item.id);});}},on?'치우기':has?'배치하기':money<item.cost?(item.cost-money)+' 코인 더 모으기':'구매 · 배치'));})),filter==='owned'&&!owned(d).length?h('p',{className:'muted'},'첫 가구를 골라볼까요? 기분을 남기면 3 코인이 쌓여요.'):null);
   }
   function Interior(props) {
     var d=props.data,date=day(),e=(d.together||{})[date]||{},moods=e.moods||{},eq=(d.house||{}).equipped||{};
@@ -73,7 +74,7 @@
     var wall=item('wall'),floor=item('floor');
     return h('div',null,h('section',{className:'house',style:{background:'linear-gradient('+(wall?wall.color:'#fff6df')+' 72%, '+(floor?floor.color:'#e4c3a5')+' 72%)'},'aria-label':'둘이 꾸민 우리 집'},h('div',{className:'house-window'},wall&&wall.id==='night'?'🌙':'☀️'),h('div',{className:'house-shelf'},'📚',item('plant')?item('plant').icon:'',item('lamp')?item('lamp').icon:''),h('div',{className:'house-sofa'},'🛋️'),h('div',{className:'house-people'},h('span',null,moods.me||'🙂'),h('span',null,moods.you||'🙂')),item('rug')?h('div',{className:'house-rug'},item('rug').icon+' 포근한 우리 집 '+item('rug').icon):null,item('pet')?h('div',{className:'house-cat'},item('pet').icon):null),h(Decorator,props));
   }
-  window.FutariHome = { Interior:Interior, HomePage:function(props){return h(window.FutariFarm.FarmPage,props);}, Decorator: Decorator, items: ITEMS, earned: earned, balance: balance, decorate: decorate, act: act, growth: growth, question: question, day:day };
+  window.FutariHome = { Interior:function(props){return window.FutariInterior?h(window.FutariInterior.Interior,props):h(Interior,props);}, HomePage:function(props){return h(window.FutariFarm.FarmPage,props);}, Decorator: Decorator, items: ITEMS, earned: earned, balance: balance, decorate: decorate, act: act, growth: growth, question: question, day:day };
   function farmIncome(d){return window.FutariFarm?window.FutariFarm.income(d):0;}
   function farmSpent(d){return window.FutariFarm?window.FutariFarm.spent(d):0;}
 })();
