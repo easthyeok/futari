@@ -2,7 +2,7 @@ const fs = require('fs'), vm = require('vm'), assert = require('assert/strict');
 let slots=[], cursor=0;
 const React={createElement:(type,props,...children)=>({type,props:props||{},children:children.flat(Infinity).filter(x=>x!==null&&x!==false&&x!==undefined)}),useState:init=>{const i=cursor++;if(!(i in slots))slots[i]=init;return [slots[i],v=>slots[i]=typeof v==='function'?v(slots[i]):v];},useEffect:()=>{},useRef:v=>({current:v}),useMemo:f=>f()};
 const context={window:{React,ReactDOM:{createRoot:()=>({render(){}})}},document:{getElementById:()=>({})},console,localStorage:{getItem:()=>null},alert:()=>{},confirm:()=>true,setTimeout,clearTimeout,setInterval,clearInterval};
-let src=fs.readFileSync(require('path').join(__dirname, '../app.js'),'utf8').replace('  try {\n    ReactDOM.createRoot', '  window.test = {TimelinePage,CoupleCalendar,DateRoulette,freshData,todayStr,memoryPhotos};\n  try {\n    ReactDOM.createRoot');
+let src=fs.readFileSync(require('path').join(__dirname, '../app.js'),'utf8').replace('  try {\n    ReactDOM.createRoot', '  window.test = {TABS,TogetherPage,TimelinePage,CoupleCalendar,DateRoulette,freshData,todayStr,memoryPhotos};\n  try {\n    ReactDOM.createRoot');
 vm.runInNewContext(fs.readFileSync(require('path').join(__dirname, '../games.js'),'utf8'),context);
 vm.runInNewContext(fs.readFileSync(require('path').join(__dirname, '../home.js'),'utf8'),context);
 vm.runInNewContext(fs.readFileSync(require('path').join(__dirname, '../board-games.js'),'utf8'),context);
@@ -38,3 +38,6 @@ const before=home.growth(shared); home.act(shared,date,'you','reactions','🫶')
 home.act(shared,date,'me','activity',true); home.act(shared,date,'you','activity',true); home.act(shared,date,'you','activity',true); assert.equal(shared.memories.length,2);
 let screen=render(home.HomePage,{data:shared,member:'me',update:f=>f(shared)},true); assert.equal(all(screen,x=>x.type==='textarea'||x.type==='input').length,0);
 console.log('PASS: paired choices, automatic memories, idempotent rewards, shared activity, keyboard-free home');
+
+assert.equal(api.TABS.length,4);assert(api.TABS.some(t=>t.id==='games'&&t.label==='보드게임'));const together=render(api.TogetherPage,{data:api.freshData()},true);assert(!text(together).includes('보드게임'),'games belong to their own bottom tab');
+console.log('PASS: independent board-game navigation');

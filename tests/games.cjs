@@ -29,7 +29,7 @@ const target={getBoundingClientRect:()=>({left:10,top:20,width:180,height:230}),
 const event=(x,y)=>({clientX:10+x/2,clientY:20+y/2,currentTarget:target,pointerId:1,pointerType:'touch',button:0,preventDefault(){}});
 surface().props.onPointerDown(event(180,410));surface().props.onPointerCancel(event(180,440));surface().props.onPointerUp(event(180,450));assert.equal(frames.length,0);
 surface().props.onPointerDown(event(180,410));surface().props.onPointerMove(event(180,461));t=render(bounce.GamePage,props);surface().props.onPointerUp(event(180,461));surface().props.onPointerUp(event(180,461));assert.equal(frames.length,1);
-frames.shift()(0);frames.shift()(1000);t=render(bounce.GamePage,props);assert(text(t).includes('B 차례'));assert.equal(slots[0].throws,1);
+frames.shift()(0);frames.shift()(1200);t=render(bounce.GamePage,props);assert(text(t).includes('B 차례'));assert.equal(slots[0].throws,1);
 assert(!text(t).includes('사목'));assert(!text(t).includes('레이스'));assert(!text(t).includes('카드 덱'));
 console.log('PASS: bounce aim/landing, rotated patterns, round/match wins, misses, collisions, depleted balls, scaled touch/cancellation');
 // Omok: legal turn, occupied cells, all win directions, no row wrapping, long lines.
@@ -59,3 +59,36 @@ t=render(board.SharedGame,{data:room,member:'me',kind:'code',update:f=>f(room)},
 const hidden=all(t,n=>n.props.className&&n.props.className.startsWith('code-tile')).slice(0,4);assert(hidden.every(n=>text(n).startsWith('?')));assert(hidden.every(n=>n.props['aria-label'].endsWith('비공개')));
 t=render(board.SharedGame,{data:room,member:'you',kind:'code',update:f=>f(room)},true);assert(text(t).includes('A의 차례를 기다려요'));assert(!text(t).includes('검정 뽑기'));
 console.log('PASS: omok directions/turn legality, code sorting/draw/guess/stop/win, empty pool, persisted state, stale action guards, mutual reset, UI secret masking');
+
+// Game quality: explicit guesses, input locks, reversible moves with consent, archival.
+function drainEffects(){const list=effects.splice(0);for(const effect of list)effect();}
+let undo=board.newOmok('me');undo=board.playOmok(undo,'me',112);undo=board.playOmok(undo,'you',113);
+assert.equal(board.requestUndo(undo,'me','request'),undo,'only the last mover can ask');
+undo=board.requestUndo(undo,'you','request');assert.equal(board.playOmok(undo,'me',114),undo);
+assert.equal(board.requestUndo(undo,'you','accept'),undo,'self approval is forbidden');
+undo=board.requestUndo(undo,'me','accept');assert.equal(undo.moves,1);assert.equal(undo.board[113],null);assert.equal(undo.last,112);assert.equal(undo.turn,'you');assert.equal(undo.audit.length,1);
+let archived={settings:{me:'A',you:'B'},boardGames:{omok:board.newOmok('me')}};
+for(const index of [0,1,2,3])archived.boardGames.omok.board[index]='me';
+let stamp={id:archived.boardGames.omok.id,revision:0};assert(board.apply(archived,'omok','me',stamp,{type:'move',index:4}));assert.equal(archived.gameResults.length,1);
+board.recordResult(archived,'omok',archived.boardGames.omok);assert.equal(archived.gameResults.length,1,'same finish cannot inflate wins');
+stamp={id:archived.boardGames.omok.id,revision:archived.boardGames.omok.revision};board.apply(archived,'omok','me',stamp,{type:'reset',action:'request'});
+stamp={id:archived.boardGames.omok.id,revision:archived.boardGames.omok.revision};board.apply(archived,'omok','you',stamp,{type:'reset',action:'accept'});assert.equal(archived.gameResults.length,1);assert.equal(archived.boardGames.omok.black,'you','starting side alternates');
+let guesses={settings:{me:'A',you:'B'},boardGames:{code:board.newCode('me',deck)}};
+guesses.boardGames.code=board.playCode(guesses.boardGames.code,'me',{type:'draw',color:'black'});
+let calls=0;const guessProps={data:guesses,member:'me',kind:'code',update:f=>{calls++;f(guesses);}};
+t=render(board.SharedGame,guessProps,true);drainEffects();
+let hiddenTiles=all(t,n=>n.props.className&&n.props.className.startsWith('code-tile'));
+hiddenTiles[0].props.onClick();t=render(board.SharedGame,guessProps);
+button(t,'2').props.onClick();assert.equal(calls,0,'number selection must not send a guess');t=render(board.SharedGame,guessProps);
+const commit=button(t,'2 · 추리 확정');commit.props.onClick();commit.props.onClick();assert.equal(calls,1,'double tap must produce one command');
+t=render(board.SharedGame,{...guessProps,gameSaving:true});assert(!text(t).includes('어떤 타일을 뽑을까요?'));assert(!text(t).includes('숫자를 선택하세요'));
+// Physical flight starts/ends exactly, and shrinks with each bounce.
+const shot={x:100,y:120,power:80};const startFlight=bounce.sampleFlight(shot,0),endFlight=bounce.sampleFlight(shot,1);
+assert.equal(startFlight.x,180);assert.equal(startFlight.y,375);assert(Math.abs(endFlight.x-shot.x)<1e-9);assert(Math.abs(endFlight.y-shot.y)<1e-9);
+assert(bounce.sampleFlight(shot,.285).height>bounce.sampleFlight(shot,.715).height);assert(Math.abs(bounce.sampleFlight(shot,.57).height)<1e-9);
+const local=new Map();context.localStorage={getItem:k=>local.get(k)||null,setItem:(k,v)=>local.set(k,v)};
+let persistent=bounce.newGame(0,[0]);persistent=bounce.throwBall(persistent,center(0));bounce.persistGame('room',persistent);assert.equal(bounce.savedGame('room').board[0],0);assert.equal(bounce.savedGame('other').throws,0);
+local.set('futari_bounce_corrupt','{"board":[]}');assert.equal(bounce.savedGame('corrupt').board.length,36);
+// A released throw is settled before animation; leaving cannot cancel a miss.
+t=render(bounce.GamePage,{...props,room:'settle-room'},true);surface().props.onPointerDown(event(180,410));surface().props.onPointerUp(event(180,445));assert.equal(bounce.savedGame('settle-room').throws,1);
+console.log('PASS: confirmation/double-tap locks, consent-only undo, alternating colours, unique persistent results, decreasing physical hops, local resume, committed throws before animation');

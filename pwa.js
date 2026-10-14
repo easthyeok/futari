@@ -44,7 +44,7 @@
       updateMessage.textContent = '변경을 저장한 뒤 다시 눌러주세요';
       return;
     }
-    if (!window.confirm('새 버전으로 다시 열까요? 바운스오프의 현재 경기는 초기화됩니다.')) return;
+    if (!window.confirm('새 버전으로 다시 열까요? 저장된 게임 진행은 유지됩니다.')) return;
     applying = true; updateButton.disabled = true;
     updateMessage.textContent = '새 버전으로 전환하고 있어요…';
     registration.waiting.postMessage({ type: 'ACTIVATE_UPDATE' });

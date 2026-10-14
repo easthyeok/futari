@@ -15,7 +15,7 @@
   function freshData() {
     return {
       settings: { me: '나', you: '너', startDate: '', anniversaries: [] },
-      memories: [], places: [], buckets: [], dates: [], moods: [], polls: [], answers: {}, together: {}, boardGames: {},
+      memories: [], places: [], buckets: [], dates: [], moods: [], polls: [], answers: {}, together: {}, boardGames: {}, gameResults: [],
     };
   }
   function normalizeData(raw) {
@@ -23,6 +23,7 @@
     d.settings = Object.assign(freshData().settings, d.settings);
     d.together = d.together || {};
     d.boardGames = d.boardGames || {};
+    d.gameResults = d.gameResults || [];
     return d;
   }
   function loadData() {
@@ -624,12 +625,13 @@
   /* ===== 메인 App ===== */
   function TogetherPage(props) {
     var state = useState('date'), section = state[0], setSection = state[1];
-    var options = [['date', '📅 약속', DatePlanPage], ['bucket', '⭐ 하고 싶은 일', BucketPage], ['games', '🎲 보드게임', window.FutariBoardGames.BoardHub]];
+    var options = [['date', '📅 약속', DatePlanPage], ['bucket', '⭐ 하고 싶은 일', BucketPage]];
     return h('div', null, h('div', { className: 'seg' }, options.map(function (x) { return h('button', { key: x[0], className: section === x[0] ? 'on' : '', onClick: function () { setSection(x[0]); } }, x[1]); })), h(options.find(function (x) { return x[0] === section; })[2], props));
   }
   var TABS = [
     { id: 'home', ico: '🏡', label: '우리 집', comp: window.FutariHome.HomePage },
     { id: 'together', ico: '💛', label: '함께하기', comp: TogetherPage },
+    { id: 'games', ico: '🎲', label: '보드게임', comp: window.FutariBoardGames.BoardHub },
     { id: 'memory', ico: '📖', label: '추억', comp: TimelinePage }
   ];
 
@@ -684,6 +686,7 @@
     var saveTimer = useRef(null), immediateSave = useRef(false);
     var dirty = useRef(!!(cachedRoom(getRoomCode()) || {}).pending), revision = useRef(0), saveQueue = useRef(Promise.resolve());
     var retryState = useState(0), retry = retryState[0], setRetry = retryState[1];
+    useEffect(function () { if (!document.body) return; document.body.classList.toggle('game-mode', tab === 'games'); return function () { document.body.classList.remove('game-mode'); }; }, [tab]);
     var skipSave = useRef(true); // 최초 로드 직후 저장 방지
 
     // 기존 방 코드가 있으면 자동으로 클라우드 로드
@@ -739,11 +742,11 @@
           }
         }).catch(function () {});
       }
-      var iv = setInterval(refresh, 10000);
+      var iv = setInterval(refresh, tab === 'games' ? 2500 : 10000);
       function onVisible() { if (document.visibilityState === 'visible') refresh(); }
       window.addEventListener('focus', refresh); document.addEventListener('visibilitychange', onVisible);
       return function () { active = false; clearInterval(iv); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', onVisible); };
-    }, [room, data]);
+    }, [room, data, tab]);
 
     function update(mutator, immediate) { if (immediate) immediateSave.current = true; dirty.current = true; revision.current++; setData(function (prev) { var next = clone(prev); mutator(next); cacheRoom(room, next, true); return next; }); }
     function recoverRemote() {
@@ -773,10 +776,10 @@
     var member = identity;
     if (!member) { try { member = localStorage.getItem('futari_identity_' + room) || ''; } catch (e) {} }
     if (member !== 'me' && member !== 'you') return h('div', { className: 'app' }, h('div', { className: 'card' }, h('h1', { className: 'title-xl' }, '이 기기는 누가 사용하나요?'), h('p', { className: 'muted' }, '각자 자신의 이름을 골라주세요. 다음부터는 기억할게요.'), h('div', { className: 'row' }, ['me', 'you'].map(function (who) { return h('button', { key: who, className: 'btn', onClick: function () { chooseIdentity(who); } }, data.settings[who]); }))));
-    var pageProps = { member: member, changeMember: function () { try { localStorage.removeItem('futari_identity_' + room); } catch (e) {} setIdentity(''); }, data: data, update: update, updateGame: function (mutator) { update(mutator, true); }, setData: function (replacement) { dirty.current = true; revision.current++; cacheRoom(room, replacement, true); setData(replacement); }, room: room, leaveRoom: leaveRoom };
+    var pageProps = { gameSaving: dirty.current, gameSyncMessage: syncMsg, retryGameSave: function () { setRetry(function (n) { return n + 1; }); }, member: member, changeMember: function () { try { localStorage.removeItem('futari_identity_' + room); } catch (e) {} setIdentity(''); }, data: data, update: update, updateGame: function (mutator) { update(mutator, true); }, setData: function (replacement) { dirty.current = true; revision.current++; cacheRoom(room, replacement, true); setData(replacement); }, room: room, leaveRoom: leaveRoom };
     var current = tab === 'settings' ? { comp: SettingsPage } : TABS.find(function (t) { return t.id === tab; });
 
-    return h('div', { className: 'app' },
+    return h('div', { className: 'app' + (tab === 'games' ? ' game-app' : '') },
       syncMsg ? h('button', { type: 'button', onClick: function () { if (syncMsg.indexOf('저장 실패') === 0) setRetry(function (n) { return n + 1; }); }, style: { border: 0, cursor: 'pointer', position: 'fixed', top: 8, left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,.65)', color: '#fff', padding: '4px 12px', borderRadius: 999, fontSize: 12, zIndex: 3000 } }, syncMsg) : null,
       h('div', { className: 'app-toolbar' }, h('span', null, data.settings[member] + '의 공간'), h('button', { className: 'btn ghost sm', onClick: function () { setTab(tab === 'settings' ? 'home' : 'settings'); } }, tab === 'settings' ? '우리 집으로' : '⚙ 설정')),
       syncMsg.indexOf('저장 실패') === 0 || syncMsg.indexOf('연결 실패') === 0 ? h('div', { className: 'card', role: 'alert' }, h('p', { className: 'muted' }, '현재 화면의 변경은 이 기기에 보관되어 있어요. 필요한 내용을 설정에서 백업한 뒤 상대 변경을 불러올 수 있어요.'), h('button', { className: 'btn ghost block', onClick: recoverRemote }, '상대 변경 불러오기')) : null,
