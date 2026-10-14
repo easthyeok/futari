@@ -1,0 +1,30 @@
+/* Daily cards are personal inputs; shared completion funds the village. */
+(function(){
+  'use strict';
+  var React=window.React,h=React.createElement;
+  var TRAVEL=[['🌊 바다','🌲 숲속 오두막','🏙 도시 여행','♨️ 온천'],['🏝 조용한 섬','🏕 캠핑','🚆 기차 여행','🏡 호캉스'],['🌸 꽃구경','⛰ 등산','🎡 놀이공원','🖼 미술관']];
+  var FOOD=[['🍜 따뜻한 국수','🍕 피자','🍣 초밥','🥘 집밥'],['🥩 고기 구이','🍝 파스타','🌶 떡볶이','🍔 햄버거'],['🥐 브런치','🍗 치킨','🍲 전골','🥗 가벼운 샐러드']];
+  var QUESTIONS=['요즘 나랑 가장 해보고 싶은 작은 일은?','최근 내가 해준 일 중 고마웠던 건?','우리의 첫 여행에서 꼭 하고 싶은 건?','지금 내게 듣고 싶은 한마디는?','우리 집에 딱 하나를 더한다면?','다시 돌아가 보고 싶은 둘만의 하루는?','이번 주 우리에게 주고 싶은 선물은?','내가 발견한 너의 귀여운 습관은?','둘이 함께 배우고 싶은 건?','아무 계획 없는 주말, 어떻게 보내고 싶어?','요즘 가장 나누고 싶은 고민은?','다음 계절에는 어디로 떠나볼까?','오늘 나를 웃게 만든 순간은?','우리의 1년 뒤 하루를 상상한다면?'];
+  function index(date){return Math.floor(Date.parse(date+'T00:00:00Z')/86400000);}
+  function options(type,date){return (type==='travel'?TRAVEL:FOOD)[index(date)%3];}
+  function question(date){return QUESTIONS[index(date)%QUESTIONS.length];}
+  function ChoiceCard(props){var d=props.data,date=props.date,type=props.kind,who=props.member,e=(d.together||{})[date]||{},values=e[type]||{},both=values.me!==undefined&&values.you!==undefined,items=options(type,date);
+    return h('section',{className:'today-choice card choice-'+type},h('span',{className:'eyebrow'},type==='travel'?'SOMEWHERE WITH YOU':'A LITTLE CRAVING'),h('h2',{className:'title-lg'},type==='travel'?'같이 떠난다면?':'오늘 먹고 싶은 건?'),h('p',{className:'muted'},type==='travel'?'지금 마음이 향하는 곳을 골라봐요.':'오늘의 메뉴를 고르는 작은 힌트.'),h('div',{className:'today-options'},items.map(function(label,i){return h('button',{key:label,className:values[who]===i?'selected':'',disabled:both,'aria-pressed':values[who]===i,onClick:function(){props.update(function(d){window.FutariHome.act(d,date,who,type,i);});}},label);})),
+      both?h('div',{className:'today-reveal','aria-live':'polite'},h('strong',null,values.me===values.you?'통했어요! 같은 마음 💛':'다른 취향도 알아가는 중 💛'),h('p',null,d.settings.me+' · '+items[values.me],h('br'),d.settings.you+' · '+items[values.you])):h('p',{className:'today-wait','aria-live':'polite'},values[who]!==undefined?'선택했어요. 상대도 고르면 둘의 취향이 열려요.':'하나를 고르면 💛 3 · 둘의 선택은 함께 공개해요.'));
+  }
+  function TodayPage(props){
+    var home=window.FutariHome,d=props.data,who=props.member,other=who==='me'?'you':'me',date=home.day(),e=(d.together||{})[date]||{},moods=e.moods||{},reactions=e.reactions||{},notes=e.notes||{},activity=e.activity||{},both=!!(notes.me&&notes.you);
+    var state=React.useState(notes[who]||''),draft=state[0],setDraft=state[1];
+    var missions=[['기분 둘 다 남기기',!!(moods.me&&moods.you)],['여행 취향 둘 다 고르기',e.travel&&e.travel.me!==undefined&&e.travel.you!==undefined],['먹고 싶은 것 둘 다 고르기',e.food&&e.food.me!==undefined&&e.food.you!==undefined],['질문카드 둘 다 답하기',both]],done=missions.filter(function(m){return m[1];}).length;
+    function act(type,value){props.update(function(d){home.act(d,date,who,type,value);});}
+    return h('div',{className:'today-page'},h('header',{className:'today-heading'},h('p',{className:'eyebrow'},'FUTARI · A LITTLE CLOSER EVERY DAY'),h('h1',{className:'title-xl'},'오늘 우리'),h('p',{className:'muted'},date.replace(/-/g,'.')+' · 작은 선택으로 서로를 알아가요.')),
+      h('section',{className:'today-missions'},h('div',{className:'shop-heading'},h('strong',null,'오늘의 마음 모으기'),h('span',{className:'pill pink'},done+' / 4')),h('progress',{value:done,max:4,'aria-label':'오늘의 공동 미션 진행'}),h('div',{className:'today-checks'},missions.map(function(m){return h('span',{key:m[0],className:m[1]?'complete':''},(m[1]?'✓ ':'○ ')+m[0]);})),h('p',{role:'status'},done===4?'🎉 모두 완료! 공동 보너스 💛 12 코인이 쌓였어요.':'각자 참여할 때마다 💛 3 · 네 가지를 함께 마치면 추가 💛 12')),
+      h('section',{className:'card today-mood'},h('span',{className:'eyebrow'},'HOW ARE YOU TODAY?'),h('h2',{className:'title-lg'},'오늘의 나는'),h('div',{className:'mood-grid'},['🥰','😊','😐','😴','😢'].map(function(m,i){return h('button',{key:m,className:'mood'+(moods[who]===m?' on':''),'aria-label':['사랑 가득','기분 좋아','평범해','피곤해','속상해'][i],'aria-pressed':moods[who]===m,onClick:function(){act('moods',m);}},m);})),h('div',{className:'partner-status'},moods[other]?d.settings[other]+'의 오늘 '+moods[other]:'상대의 오늘 기분을 기다리고 있어요.'),moods[other]?h('button',{className:'btn ghost block',disabled:!!reactions[who],onClick:function(){act('reactions','🫶');}},reactions[who]?'마음을 보냈어요 🫶':'마음 보내기 🫶'):null,reactions[other]?h('p',{className:'muted'},d.settings[other]+'님이 마음을 보냈어요 🫶'):null),
+      h(ChoiceCard,Object.assign({},props,{date:date,kind:'travel'})),h(ChoiceCard,Object.assign({},props,{date:date,kind:'food'})),
+      h('section',{className:'card today-question'},h('span',{className:'eyebrow'},'A QUESTION FOR US · '+(index(date)%QUESTIONS.length+1)),h('h2',{className:'title-lg'},'오늘의 질문카드'),h('blockquote',null,question(date)),h('label',{htmlFor:'today-answer'},d.settings[who]+'의 답변'),h('textarea',{id:'today-answer',value:draft,maxLength:300,rows:3,placeholder:'길지 않아도 좋아요. 오늘의 생각을 남겨주세요.',onChange:function(ev){setDraft(ev.target.value);}}),h('div',{className:'today-answer-footer'},h('small',null,draft.length+' / 300'),h('button',{className:'btn sm',disabled:!draft.trim()||draft.trim()===notes[who],onClick:function(){act('notes',draft.trim());}},notes[who]?'답변 수정':'답변 남기기 · 💛 3')),
+        both?h('div',{className:'today-reveal','aria-live':'polite'},['me','you'].map(function(w){return h('div',{key:w},h('strong',null,d.settings[w]+'의 답변'),h('p',{className:'answer-text'},notes[w]));})):h('p',{className:'today-wait','aria-live':'polite'},notes[who]?'답변을 저장했어요. 상대도 답하면 함께 열려요.':'둘 다 답하면 서로의 답변을 볼 수 있어요.')),
+      h('section',{className:'card'},h('h2',{className:'title-lg'},'🌿 오늘 함께한 작은 시간'),h('p',{className:'muted'},'함께 산책했거나 잠깐이라도 같이 쉬었나요? 둘 다 확인하면 💛 9 코인이 쌓여요.'),h('button',{className:'btn block',disabled:!!activity[who],onClick:function(){act('activity',true);}},activity[who]?activity[other]?'함께한 시간을 남겼어요 ✓':'상대의 확인을 기다려요 ✓':'함께했어요')),
+      h('p',{className:'today-outro'},'오늘 나눈 마음이 우리 마을의 내일이 돼요 🌱'));
+  }
+  window.FutariToday={TodayPage:TodayPage,ChoiceCard:ChoiceCard,options:options,question:question};
+})();

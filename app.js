@@ -15,7 +15,7 @@
   function freshData() {
     return {
       settings: { me: '나', you: '너', startDate: '', anniversaries: [] },
-      memories: [], places: [], buckets: [], dates: [], moods: [], polls: [], answers: {}, together: {}, house: { owned: [], equipped: {} }, boardGames: {}, gameResults: [], dodge: {},
+      memories: [], places: [], buckets: [], dates: [], moods: [], polls: [], answers: {}, together: {}, house: { owned: [], equipped: {} }, boardGames: {}, gameResults: [], dodge: {}, farm: { level: 0, buildings: {}, crops: {}, seedSpent: 0, harvestCoins: 0, harvests: 0 },
     };
   }
   function normalizeData(raw) {
@@ -26,6 +26,7 @@
     d.boardGames = d.boardGames || {};
     d.gameResults = d.gameResults || [];
     d.dodge = d.dodge || {};
+    d.farm = d.farm || freshData().farm;
     return d;
   }
   function loadData() {
@@ -47,6 +48,7 @@
       base.boardGames = p.boardGames || {};
       base.gameResults = p.gameResults || [];
       base.dodge = p.dodge || {};
+      base.farm = p.farm || base.farm;
       return base;
     } catch (e) { console.warn('load failed', e); return freshData(); }
   }
@@ -636,10 +638,10 @@
     return h('div', null, h('div', { className: 'seg' }, options.map(function (x) { return h('button', { key: x[0], className: section === x[0] ? 'on' : '', onClick: function () { setSection(x[0]); } }, x[1]); })), h(options.find(function (x) { return x[0] === section; })[2], props));
   }
   var TABS = [
-    { id: 'home', ico: '🏡', label: '우리 집', comp: window.FutariHome.HomePage },
-    { id: 'together', ico: '💛', label: '함께하기', comp: TogetherPage },
-    { id: 'games', ico: '🎲', label: '보드게임', comp: window.FutariBoardGames.BoardHub },
-    { id: 'memory', ico: '📖', label: '추억', comp: TimelinePage }
+    { id: 'home', ico: '🏡', label: '우리 마을', comp: window.FutariHome.HomePage },
+    { id: 'today', ico: '💛', label: '오늘 우리', comp: window.FutariToday.TodayPage },
+    { id: 'together', ico: '📅', label: '약속', comp: TogetherPage },
+    { id: 'games', ico: '🎲', label: '보드게임', comp: window.FutariBoardGames.BoardHub }
   ];
 
   /* ===== 방 코드 입력 화면 ===== */
@@ -693,7 +695,7 @@
     var saveTimer = useRef(null), immediateSave = useRef(false);
     var dirty = useRef(!!(cachedRoom(getRoomCode()) || {}).pending), revision = useRef(0), saveQueue = useRef(Promise.resolve());
     var retryState = useState(0), retry = retryState[0], setRetry = retryState[1];
-    useEffect(function () { if (!document.body) return; document.body.classList.toggle('game-mode', tab === 'games'); return function () { document.body.classList.remove('game-mode'); }; }, [tab]);
+    useEffect(function () { if (!document.body) return; document.body.classList.toggle('game-mode', tab === 'games'); document.body.classList.toggle('farm-mode', tab === 'home' || tab === 'today'); return function () { document.body.classList.remove('game-mode'); document.body.classList.remove('farm-mode'); }; }, [tab]);
     var skipSave = useRef(true); // 최초 로드 직후 저장 방지
 
     // 기존 방 코드가 있으면 자동으로 클라우드 로드
@@ -788,7 +790,7 @@
 
     return h('div', { className: 'app' + (tab === 'games' ? ' game-app' : '') },
       syncMsg ? h('button', { type: 'button', onClick: function () { if (syncMsg.indexOf('저장 실패') === 0) setRetry(function (n) { return n + 1; }); }, style: { border: 0, cursor: 'pointer', position: 'fixed', top: 8, left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,.65)', color: '#fff', padding: '4px 12px', borderRadius: 999, fontSize: 12, zIndex: 3000 } }, syncMsg) : null,
-      h('div', { className: 'app-toolbar' }, h('span', null, data.settings[member] + '의 공간'), h('button', { className: 'btn ghost sm', onClick: function () { setTab(tab === 'settings' ? 'home' : 'settings'); } }, tab === 'settings' ? '우리 집으로' : '⚙ 설정')),
+      h('div', { className: 'app-toolbar' }, h('span', null, data.settings[member] + '의 공간'), h('button', { className: 'btn ghost sm', onClick: function () { setTab(tab === 'settings' ? 'home' : 'settings'); } }, tab === 'settings' ? '마을로' : '⚙ 설정')),
       syncMsg.indexOf('저장 실패') === 0 || syncMsg.indexOf('연결 실패') === 0 ? h('div', { className: 'card', role: 'alert' }, h('p', { className: 'muted' }, '현재 화면의 변경은 이 기기에 보관되어 있어요. 필요한 내용을 설정에서 백업한 뒤 상대 변경을 불러올 수 있어요.'), h('button', { className: 'btn ghost block', onClick: recoverRemote }, '상대 변경 불러오기')) : null,
       h(current.comp, pageProps),
       h('nav', { className: 'tabbar' }, TABS.map(function (t) {

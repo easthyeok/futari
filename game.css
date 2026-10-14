@@ -184,3 +184,101 @@ body.game-mode #root { max-width:820px; }
 .dodge-personal strong { display:block; margin-top:6px; font-size:23px; color:#83ece5; font-variant-numeric:tabular-nums; }
 .dodge-archive-row { display:grid; grid-template-columns:1.3fr 1fr 1fr; gap:8px; border-top:1px solid #34415f; padding:10px 0; font-size:10px; font-variant-numeric:tabular-nums; }
 .dodge-archive-row strong { text-align:right; }
+
+/* Our countryside: a playable village, with an indoor room behind the front door. */
+.farm-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:20px; }
+.farm-heading h1 { margin:7px 0; font-size:27px; letter-spacing:-1px; }
+.farm-heading .eyebrow { font-size:8px; }
+.farm-heading .muted { font-size:12px; line-height:1.7; }
+.farm-heading .coin-badge { padding:10px 12px; font-size:13px; }
+.farm-view-tabs { display:flex; gap:8px; margin-bottom:15px; }
+.farm-view-tabs button { flex:1; min-height:44px; border:1px solid #d9e1cb; background:#fffaf4; border-radius:14px; font:inherit; font-size:12px; color:#697258; cursor:pointer; }
+.farm-view-tabs [aria-pressed=true] { background:#526e4e; border-color:#526e4e; color:#fff8e8; }
+.farm-world { position:relative; overflow:hidden; isolation:isolate; padding:0 18px 24px; border:1px solid #c4d9b3; border-radius:28px; background:linear-gradient(#d9eee4 0%,#e8f1d9 32%,#bcd79f 32%,#d0e3b5 100%); box-shadow:0 10px 30px #4c724915; }
+.farm-world:before { content:''; position:absolute; left:-15%; right:-15%; height:90px; top:85px; background:#bcd79f; border-radius:50% 50% 0 0; z-index:-1; }
+.farm-sky { position:relative; height:55px; }
+.farm-world-label { position:absolute; left:0; top:22px; font-size:7px; letter-spacing:2px; color:#718b76; }
+.farm-sun { position:absolute; right:9px; top:16px; font-size:28px; color:#e8be6d; }
+.farm-cloud { position:absolute; height:10px; width:44px; border-radius:20px; background:#fffffbb3; }
+.farm-cloud:after { content:''; position:absolute; width:22px; height:17px; border-radius:50%; background:#fffffbb3; bottom:0; left:10px; }
+.cloud-one { left:40%; top:26px; }
+.cloud-two { right:25%; top:50px; transform:scale(.7); }
+.farm-house-button { display:flex; align-items:center; flex-direction:column; position:relative; width:100%; border:0; background:transparent; cursor:pointer; padding:0; color:#4b6345; }
+.farm-cottage { width:68%; max-width:260px; height:auto; overflow:visible; filter:drop-shadow(0 5px 3px #4c724912); }
+.farm-house-label { margin-top:-2px; padding:6px 13px; background:#fff8e7de; border:1px solid #aabd8b77; border-radius:20px; font-size:10px; }
+.farm-path { width:38px; height:20px; margin:0 auto; background:repeating-linear-gradient(0deg,#dac7a3 0 7px,#cfba9599 7px 9px); border-radius:3px; }
+.farm-plots { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:9px; position:relative; }
+.farm-plot { aspect-ratio:1; min-width:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; border:1px dashed #8eab6c; border-radius:14px; background:#e8efd080; box-shadow:0 3px 0 #809d5c35; color:#6c7d4f; font:inherit; cursor:pointer; padding:6px 1px; }
+.farm-plot .plot-icon { font-size:clamp(20px,6.5vw,32px); line-height:1.2; }
+.farm-plot small { font-size:8px; white-space:nowrap; }
+.farm-plot.built { border:1px solid #a7bf83; background:#e7edce; }
+.farm-plot.plot-garden,.farm-plot.plot-greenhouse { background:repeating-linear-gradient(0deg,#ac865c 0 10px,#b58f65 10px 12px); color:#fff6dc; border-color:#927447; }
+.farm-plot.plot-pond { background:#a7d6d0; border-color:#7db8ad; }
+.farm-plot.plot-flowers { background:#e4e9bb; }
+.farm-plot.selected { outline:3px solid #fff9df; outline-offset:1px; box-shadow:0 3px 0 #6c895c55,0 0 0 5px #7d9b64; }
+.farm-plot.harvest-ready { background:#f1df9d; color:#745a2c; border-color:#d0ad57; }
+.farm-plot.moving { outline:3px dashed #fff; }
+.farm-plot:disabled { opacity:.32; cursor:default; border-style:solid; background:#aec58d; box-shadow:none; }
+.farm-plot:focus-visible,.farm-house-button:focus-visible { outline:3px solid #577d4a; outline-offset:3px; }
+.farm-status { display:flex; justify-content:space-between; gap:10px; margin:14px 3px 0; font-size:11px; color:#6c7d55; }
+.farm-notice { min-height:34px; margin:12px 0; padding:8px 0; font-size:12px; line-height:1.7; color:#657b57; }
+.farm-page .card { border:1px solid #e0e5d4; background:#fffdf7; box-shadow:0 4px 18px #536d4010; }
+.farm-page .btn { background:#627e53; }
+.farm-page .btn.ghost { background:#edf1e4; color:#61724f; }
+.farm-page .btn:disabled { opacity:.45; cursor:default; }
+.farm-page .title-lg { color:#4e6544; font-size:18px; }
+.farm-inspector .shop-heading { gap:8px; }
+.farm-inspector .shop-heading .btn { flex:none; }
+.building-list { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:18px 0; }
+.building-option { display:flex; flex-direction:column; align-items:center; gap:7px; padding:12px 3px; min-width:0; border:1px solid #e0e5d3; border-radius:13px; background:#f7f8ee; color:#62714f; font:inherit; cursor:pointer; }
+.building-option>span { font-size:27px; }
+.building-option strong { font-size:11px; }
+.building-option small { font-size:10px; }
+.building-option.on { border-color:#819f68; background:#e5edd6; box-shadow:inset 0 0 0 1px #819f68; }
+.seed-list { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:16px; }
+.seed-card { display:flex; align-items:center; flex-direction:column; gap:7px; padding:14px 3px; border:1px solid #e1dfc3; border-radius:14px; background:#fbf7e6; color:#776648; font:inherit; cursor:pointer; }
+.seed-card>span { font-size:30px; }
+.seed-card strong { font-size:12px; }
+.seed-card small { font-size:8px; }
+.seed-card:disabled { opacity:.45; cursor:default; }
+.crop-care { padding:18px 0 5px; text-align:center; color:#69784d; }
+.crop-care p { font-size:12px; }
+.crop-care progress { display:block; width:100%; height:8px; accent-color:#829b5c; margin:16px 0; }
+.upgrade-requirements { display:flex; gap:12px; justify-content:space-between; font-size:11px; color:#8a7d5a; margin:18px 0; }
+.farm-tip { padding:5px 6px; margin-top:22px; color:#7b8667; }
+.farm-tip strong { font-size:13px; }
+.farm-tip p { font-size:11px; line-height:1.9; }
+.farm-page .house { margin-bottom:20px; }
+
+/* Today: daily choices and a question card. */
+.today-heading { margin-bottom:24px; }
+.today-heading .title-xl { margin:8px 0; font-size:30px; }
+.today-heading .muted { font-size:12px; }
+.today-missions { padding:20px; border:1px solid #e4dfbf; border-radius:22px; background:linear-gradient(120deg,#faf3dd,#edf0da); margin-bottom:20px; color:#6f714c; }
+.today-missions progress { width:100%; height:8px; margin:18px 0 12px; accent-color:#a5ad6c; }
+.today-missions>p { margin:14px 0 0; font-size:11px; line-height:1.7; }
+.today-checks { display:grid; grid-template-columns:1fr 1fr; gap:9px; font-size:10px; color:#979579; }
+.today-checks .complete { color:#58754b; }
+.today-page .card { border:1px solid #eee4db; box-shadow:0 5px 20px #87634a0a; }
+.today-page .eyebrow { font-size:9px; }
+.today-page .title-lg { margin-top:10px; }
+.today-options { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:18px 0 14px; }
+.today-options button { min-height:64px; border:1px solid #e6dfd5; background:#fffaf4; border-radius:14px; padding:12px 8px; font:inherit; font-size:13px; color:#7c6857; cursor:pointer; }
+.today-options button.selected { background:#f5dfd2; border:2px solid #c99c81; color:#73513a; }
+.today-options button:disabled { cursor:default; }
+.choice-travel { background:linear-gradient(140deg,#fffef9,#edf4ed); }
+.choice-food { background:linear-gradient(140deg,#fffefa,#fff0df); }
+.today-wait { font-size:11px; line-height:1.8; color:#a08c7e; margin-bottom:0; }
+.today-reveal { background:#f4efe5; border-radius:14px; padding:15px; font-size:12px; color:#856d54; line-height:1.8; margin-top:14px; }
+.today-reveal p { margin:8px 0 0; }
+.today-reveal>div+div { padding-top:12px; margin-top:12px; border-top:1px solid #dfd4c6; }
+.today-question { background:#fffdf6; }
+.today-question blockquote { margin:22px 0; padding:16px; background:#f4eddf; border-left:3px solid #cfb185; border-radius:0 12px 12px 0; color:#7b654d; font-size:18px; line-height:1.6; font-weight:600; word-break:keep-all; }
+.today-question label { display:block; margin-bottom:8px; font-size:12px; }
+.today-question textarea { resize:vertical; min-height:96px; }
+.today-answer-footer { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:10px; }
+.today-answer-footer small { font-size:10px; color:#a28d7c; }
+.answer-text { white-space:pre-wrap; overflow-wrap:anywhere; }
+.today-outro { padding:12px 0; text-align:center; color:#a18f80; font-size:11px; }
+@media(max-width:370px){.farm-world{padding-left:12px;padding-right:12px}.farm-plots{gap:7px}.farm-plot small{font-size:7px}.farm-heading h1{font-size:24px}.farm-heading .coin-badge{font-size:11px;padding:8px}.seed-card small{font-size:7px}}
+body.farm-mode { background:linear-gradient(155deg,#edf2e2,#fbf4e6 65%,#edf0de); }

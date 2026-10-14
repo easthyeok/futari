@@ -5,6 +5,8 @@ const context={window:{React,ReactDOM:{createRoot:()=>({render(){}})}},document:
 let src=fs.readFileSync(require('path').join(__dirname, '../app.js'),'utf8').replace('  try {\n    ReactDOM.createRoot', '  window.test = {TABS,TogetherPage,TimelinePage,CoupleCalendar,DateRoulette,freshData,todayStr,memoryPhotos};\n  try {\n    ReactDOM.createRoot');
 vm.runInNewContext(fs.readFileSync(require('path').join(__dirname, '../home.js'),'utf8'),context);
 vm.runInNewContext(fs.readFileSync(require('path').join(__dirname, '../board-games.js'),'utf8'),context);
+vm.runInNewContext(fs.readFileSync(require('path').join(__dirname, '../farm.js'),'utf8'),context);
+vm.runInNewContext(fs.readFileSync(require('path').join(__dirname, '../today.js'),'utf8'),context);
 vm.runInNewContext(src,context); const api=context.window.test;
 function render(comp,props,reset=false){if(reset)slots=[];cursor=0;return comp(props);}
 function all(n,p){if(!n||typeof n!=='object')return [];return (p(n)?[n]:[]).concat(...n.children.map(x=>all(x,p)));}
@@ -38,7 +40,7 @@ home.act(shared,date,'me','activity',true); home.act(shared,date,'you','activity
 let screen=render(home.HomePage,{data:shared,member:'me',update:f=>f(shared)},true); assert.equal(all(screen,x=>x.type==='textarea'||x.type==='input').length,0);
 console.log('PASS: paired choices, automatic memories, idempotent rewards, shared activity, keyboard-free home');
 
-assert.equal(api.TABS.length,4);assert(api.TABS.some(t=>t.id==='games'&&t.label==='보드게임'));const together=render(api.TogetherPage,{data:api.freshData()},true);assert(!text(together).includes('보드게임'),'games belong to their own bottom tab');
+assert.equal(api.TABS.length,4);assert.equal(api.TABS[1].id,'today');assert(!api.TABS.some(t=>t.id==='memory'));assert(api.TABS.some(t=>t.id==='games'&&t.label==='보드게임'));const together=render(api.TogetherPage,{data:api.freshData()},true);assert(!text(together).includes('보드게임'),'games belong to their own bottom tab');
 console.log('PASS: independent board-game navigation');
 
 // Shop interaction uses the current shared balance and retains purchased furniture.
@@ -50,5 +52,22 @@ let plant=all(shop,x=>x.type==='article'&&text(x).includes('초록 화분'))[0];
 assert.equal(shopData.house.equipped.plant,'plant');
 shop=render(home.Decorator,shopProps);plant=all(shop,x=>x.type==='article'&&text(x).includes('초록 화분'))[0];button(plant,'치우기').props.onClick();assert.equal(shopData.house.equipped.plant,null);
 shop=render(home.Decorator,shopProps);button(shop,'보관함').props.onClick();shop=render(home.Decorator,shopProps);assert.equal(all(shop,x=>x.type==='article').length,1);button(shop,'배치하기').props.onClick();assert.equal(shopData.house.equipped.plant,'plant');
-const homeView=render(home.HomePage,{...shopProps,member:'me'},true);assert(text(homeView).includes('보너스 12 코인이 쌓였어요'));assert.equal(all(homeView,x=>x.props['aria-label']==='둘이 꾸민 우리 집').length,1);
+const homeView=render(home.HomePage,{...shopProps,member:'me'},true);assert(!text(homeView).includes('오늘의 나는'));const farmView=render(context.window.FutariFarm.FarmPage,{...shopProps,member:'me'},true);assert.equal(all(farmView,x=>x.props['aria-label']==='함께 키우는 농장').length,1);
 console.log('PASS: shop purchase/removal, inventory filter, free re-equip, completed mission feedback and room preview');
+
+// Farm navigation, construction and daily cards are usable through their controls.
+const farm=context.window.FutariFarm,today=context.window.FutariToday;
+let villageData=api.freshData(),nowDay=home.day();
+for(const who of ['me','you']){home.act(villageData,nowDay,who,'moods','😊');home.act(villageData,nowDay,who,'travel',1);home.act(villageData,nowDay,who,'food',2);home.act(villageData,nowDay,who,'notes','우리의 하루');}
+const villageProps={data:villageData,member:'me',update:f=>f(villageData)};
+let village=render(farm.FarmPage,villageProps,true);
+all(village,x=>x.props['aria-label']==='1번 자리 · 빈 땅')[0].props.onClick();village=render(farm.FarmPage,villageProps);button(village,'작은 텃밭 짓기 · 💛 12').props.onClick();assert.equal(villageData.farm.buildings[0],'garden');
+village=render(farm.FarmPage,villageProps);const radish=all(village,x=>x.type==='button'&&text(x).includes('래디시'))[0];assert(radish);radish.props.onClick();assert.equal(villageData.farm.crops[0].id,'radish');
+village=render(farm.FarmPage,villageProps);button(village,'물 주기 · 15초 단축').props.onClick();assert(villageData.farm.crops[0].watered.me);
+button(village,'🛋 집 안 꾸미기').props.onClick();village=render(farm.FarmPage,villageProps);assert(all(village,x=>x.type===home.Interior).length);
+let cardData=api.freshData(),cardProps={data:cardData,member:'me',update:f=>f(cardData),date:nowDay,kind:'travel'};
+let card=render(today.ChoiceCard,cardProps,true);all(card,x=>x.type==='button')[0].props.onClick();assert.equal(cardData.together[nowDay].travel.me,0);card=render(today.ChoiceCard,cardProps);assert(text(card).includes('상대도 고르면'));
+home.act(cardData,nowDay,'you','travel',1);card=render(today.ChoiceCard,cardProps);assert(text(card).includes('다른 취향'));assert(all(card,x=>x.type==='button').every(x=>x.props.disabled));
+let daily=render(today.TodayPage,cardProps,true);all(daily,x=>x.type==='textarea')[0].props.onChange({target:{value:'같이 걷고 싶어'}});daily=render(today.TodayPage,cardProps);button(daily,'답변 남기기 · 💛 3').props.onClick();assert.equal(cardData.together[nowDay].notes.me,'같이 걷고 싶어');assert.equal(cardData.together[nowDay].notes.you,undefined);
+home.act(cardData,nowDay,'you','notes','상대만의 답');daily=render(today.TodayPage,cardProps);assert(text(daily).includes('상대만의 답'));
+console.log('PASS: farm construction/seed/watering controls, indoor navigation, own-only daily choices/answer submission and paired reveals');

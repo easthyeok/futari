@@ -19,7 +19,7 @@ const client = { from() {
   }; return query;
 } };
 const React = { createElement(){}, useState(){}, useEffect(){}, useRef(){}, useMemo(){} };
-const ctx = { window: { React, ReactDOM: {createRoot:()=>({render(){}})}, FutariHome:{HomePage(){}}, FutariGames:{GamePage(){}}, FutariBoardGames:{BoardHub(){}}, FUTARI_CONFIG:{SUPABASE_URL:'mock',SUPABASE_KEY:'mock'}, supabase:{createClient:()=>client} }, document:{getElementById:()=>({})}, localStorage:{getItem:()=>null}, console };
+const ctx = { window: { React, ReactDOM: {createRoot:()=>({render(){}})}, FutariToday:{TodayPage(){}}, FutariHome:{HomePage(){}}, FutariGames:{GamePage(){}}, FutariBoardGames:{BoardHub(){}}, FUTARI_CONFIG:{SUPABASE_URL:'mock',SUPABASE_KEY:'mock'}, supabase:{createClient:()=>client} }, document:{getElementById:()=>({})}, localStorage:{getItem:()=>null}, console };
 const source = fs.readFileSync(path.join(__dirname,'../app.js'),'utf8').replace('  try {\n    ReactDOM.createRoot', '  window.syncTest = {cloudLoad,cloudSave,normalizeData};\n  try {\n    ReactDOM.createRoot');
 vm.runInNewContext(source,ctx);
 (async()=>{
