@@ -2,7 +2,7 @@
 'use strict';
 const BASE = new URL('./', self.location.href);
 const CACHE_PREFIX = 'futari-shell-' + encodeURIComponent(BASE.pathname) + '-';
-const CACHE_NAME = CACHE_PREFIX + 'v2';
+const CACHE_NAME = CACHE_PREFIX + 'v3';
 const SHELL = [
   'index.html', 'app.js', 'home.js', 'games.js', 'board-games.js', 'config.js', 'pwa.js',
   'manifest.webmanifest', 'vendor/react.js', 'vendor/react-dom.js', 'vendor/supabase.js',
@@ -32,4 +32,8 @@ self.addEventListener('fetch', event => {
     const cached = await cache.match(key);
     return cached || fetch(request);
   }));
+});
+
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'ACTIVATE_UPDATE') event.waitUntil(self.skipWaiting());
 });
