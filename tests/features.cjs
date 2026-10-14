@@ -3,7 +3,6 @@ let slots=[], cursor=0;
 const React={createElement:(type,props,...children)=>({type,props:props||{},children:children.flat(Infinity).filter(x=>x!==null&&x!==false&&x!==undefined)}),useState:init=>{const i=cursor++;if(!(i in slots))slots[i]=init;return [slots[i],v=>slots[i]=typeof v==='function'?v(slots[i]):v];},useEffect:()=>{},useRef:v=>({current:v}),useMemo:f=>f()};
 const context={window:{React,ReactDOM:{createRoot:()=>({render(){}})}},document:{getElementById:()=>({})},console,localStorage:{getItem:()=>null},alert:()=>{},confirm:()=>true,setTimeout,clearTimeout,setInterval,clearInterval};
 let src=fs.readFileSync(require('path').join(__dirname, '../app.js'),'utf8').replace('  try {\n    ReactDOM.createRoot', '  window.test = {TABS,TogetherPage,TimelinePage,CoupleCalendar,DateRoulette,freshData,todayStr,memoryPhotos};\n  try {\n    ReactDOM.createRoot');
-vm.runInNewContext(fs.readFileSync(require('path').join(__dirname, '../games.js'),'utf8'),context);
 vm.runInNewContext(fs.readFileSync(require('path').join(__dirname, '../home.js'),'utf8'),context);
 vm.runInNewContext(fs.readFileSync(require('path').join(__dirname, '../board-games.js'),'utf8'),context);
 vm.runInNewContext(src,context); const api=context.window.test;
@@ -27,7 +26,7 @@ data.buckets=[{text:'완료',category:'여행',done:true},{text:'카페',categor
 t=render(api.DateRoulette,{data:{buckets:[]}},true);assert.equal(button(t,'데이트 뽑기').props.disabled,true);
 console.log('PASS: search, edit, legacy photo preservation, text-only creation, calendar selection/leap year/year transition, roulette and empty states');
 
-const appSource=fs.readFileSync(require('path').join(__dirname,'../app.js'),'utf8');const html=fs.readFileSync(require('path').join(__dirname,'../index.html'),'utf8');assert(!appSource.includes('MapPage'));assert(!html.includes('dapi.kakao'));assert(html.indexOf('src="games.js"')<html.indexOf('src="app.js"'));
+const appSource=fs.readFileSync(require('path').join(__dirname,'../app.js'),'utf8');const html=fs.readFileSync(require('path').join(__dirname,'../index.html'),'utf8');assert(!appSource.includes('MapPage'));assert(!html.includes('dapi.kakao'));assert(html.indexOf('src="home.js"')<html.indexOf('src="app.js"'));
 
 const home=context.window.FutariHome; let shared=api.freshData(); const date='2026-10-14';
 home.act(shared,date,'me','choices',0); assert.equal(shared.memories.length,0);
@@ -41,3 +40,15 @@ console.log('PASS: paired choices, automatic memories, idempotent rewards, share
 
 assert.equal(api.TABS.length,4);assert(api.TABS.some(t=>t.id==='games'&&t.label==='보드게임'));const together=render(api.TogetherPage,{data:api.freshData()},true);assert(!text(together).includes('보드게임'),'games belong to their own bottom tab');
 console.log('PASS: independent board-game navigation');
+
+// Shop interaction uses the current shared balance and retains purchased furniture.
+let shopData=api.freshData();
+for(const who of ['me','you']){home.act(shopData,date,who,'moods','😊');home.act(shopData,date,who,'choices',0);home.act(shopData,date,who,'activity',true);}
+const shopProps={data:shopData,update:f=>f(shopData)};
+let shop=render(home.Decorator,shopProps,true);
+let plant=all(shop,x=>x.type==='article'&&text(x).includes('초록 화분'))[0];button(plant,'구매 · 배치').props.onClick();
+assert.equal(shopData.house.equipped.plant,'plant');
+shop=render(home.Decorator,shopProps);plant=all(shop,x=>x.type==='article'&&text(x).includes('초록 화분'))[0];button(plant,'치우기').props.onClick();assert.equal(shopData.house.equipped.plant,null);
+shop=render(home.Decorator,shopProps);button(shop,'보관함').props.onClick();shop=render(home.Decorator,shopProps);assert.equal(all(shop,x=>x.type==='article').length,1);button(shop,'배치하기').props.onClick();assert.equal(shopData.house.equipped.plant,'plant');
+const homeView=render(home.HomePage,{...shopProps,member:'me'},true);assert(text(homeView).includes('보너스 12 코인이 쌓였어요'));assert.equal(all(homeView,x=>x.props['aria-label']==='둘이 꾸민 우리 집').length,1);
+console.log('PASS: shop purchase/removal, inventory filter, free re-equip, completed mission feedback and room preview');

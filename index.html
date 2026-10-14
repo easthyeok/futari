@@ -108,16 +108,6 @@
     .player-0 { color: #a72852; background: #ffdae5; }
     .player-1 { color: #205770; background: #d6edf7; }
     .player-tag.current { border-color: currentColor; font-weight: 800; }
-    .bounce-scores { display:flex; gap:10px; margin:16px 0; }
-    .bounce-scores > div { flex:1; text-align:center; }
-    .bounce-scores small { display:block; margin-top:6px; font-weight:400; }
-    .bounce-challenge { display:flex; gap:16px; align-items:center; background:#fffaf0; border:1px solid #ead5bd; border-radius:18px; padding:12px; }
-    .bounce-challenge p { margin-bottom:0; }
-    .pattern-preview { width:90px; height:90px; flex:none; background:#f0e1ce; border-radius:12px; }
-    .bounce-table { display:block; width:100%; height:auto; background:#fff3e1; border-radius:24px; touch-action:none; user-select:none; cursor:grab; }
-    .bounce-table:active { cursor:grabbing; }
-    .bounce-table:focus-visible { outline:3px solid #b12c62; outline-offset:3px; }
-    .bounce-feedback { background:#fff; border-radius:12px; padding:12px; font-size:14px; line-height:1.6; min-height:64px; }
     .shared-status { padding:14px; border-radius:12px; background:#fff3df; font-weight:700; }
     .omok-scroll { overflow-x:auto; padding:3px; }
     .omok-board { display:grid; grid-template-columns:repeat(15,minmax(0,1fr)); min-width:360px; padding:10px; border:6px solid #9b7350; border-radius:12px; background:#e5bb82; }
@@ -129,17 +119,6 @@
     .omok-cell.last .stone:after { content:''; position:absolute; top:40%; left:40%; width:20%; height:20%; border-radius:50%; background:#e87575; }
     .omok-cell.win .stone { outline:3px solid #e2527a; }
     .omok-cell.candidate { outline:2px solid #d83c6b; z-index:1; }
-    .code-hand { display:flex; gap:7px; flex-wrap:wrap; margin-bottom:18px; }
-    .code-tile { width:48px; min-height:72px; border:2px solid #dbbda5; border-radius:10px; font:inherit; cursor:pointer; }
-    .code-tile span { display:block; font-size:24px; font-weight:800; }
-    .code-tile small { display:block; font-size:9px; margin-top:6px; }
-    .code-tile.black { background:#352d2b; color:#fff; }
-    .code-tile.white { background:#fff; color:#352d2b; }
-    .code-tile:disabled { opacity:1; }
-    .code-tile.revealed { border-style:dashed; }
-    .code-tile.selected { outline:3px solid #ff5d8f; outline-offset:2px; }
-    .code-numbers { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
-    .code-drawn { padding:12px; background:#fff; border-radius:12px; }
     .turn-dot { margin-left:4px; color:#cc375e; font-size:9px; }
     .board-selector button { padding:10px 3px; font-size:12px; }
     .reset-request { margin-top:12px; }
@@ -180,7 +159,6 @@
     <button id="pwa-update-button" class="btn sm" type="button">업데이트</button>
   </aside>
   <div id="root"></div>
-  <script src="games.js"></script>
   <script src="home.js"></script>
   <script src="board-games.js"></script>
   <script src="app.js"></script>

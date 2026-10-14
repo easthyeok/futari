@@ -15,13 +15,14 @@
   function freshData() {
     return {
       settings: { me: '나', you: '너', startDate: '', anniversaries: [] },
-      memories: [], places: [], buckets: [], dates: [], moods: [], polls: [], answers: {}, together: {}, boardGames: {}, gameResults: [],
+      memories: [], places: [], buckets: [], dates: [], moods: [], polls: [], answers: {}, together: {}, house: { owned: [], equipped: {} }, boardGames: {}, gameResults: [],
     };
   }
   function normalizeData(raw) {
     var d = Object.assign(freshData(), raw || {});
     d.settings = Object.assign(freshData().settings, d.settings);
     d.together = d.together || {};
+    d.house = d.house || { owned: [], equipped: {} };
     d.boardGames = d.boardGames || {};
     d.gameResults = d.gameResults || [];
     return d;
@@ -40,6 +41,10 @@
       base.moods = p.moods || [];
       base.polls = p.polls || [];
       base.answers = p.answers || {};
+      base.together = p.together || {};
+      base.house = p.house || base.house;
+      base.boardGames = p.boardGames || {};
+      base.gameResults = p.gameResults || [];
       return base;
     } catch (e) { console.warn('load failed', e); return freshData(); }
   }

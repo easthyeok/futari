@@ -2,9 +2,9 @@
 'use strict';
 const BASE = new URL('./', self.location.href);
 const CACHE_PREFIX = 'futari-shell-' + encodeURIComponent(BASE.pathname) + '-';
-const CACHE_NAME = CACHE_PREFIX + 'v5';
+const CACHE_NAME = CACHE_PREFIX + 'v6';
 const SHELL = [
-  'index.html', 'app.js', 'home.js', 'games.js', 'board-games.js', 'game.css', 'config.js', 'pwa.js',
+  'index.html', 'app.js', 'home.js', 'board-games.js', 'game.css', 'config.js', 'pwa.js',
   'manifest.webmanifest', 'vendor/react.js', 'vendor/react-dom.js', 'vendor/supabase.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png'
 ].map(path => new URL(path, BASE).href);
