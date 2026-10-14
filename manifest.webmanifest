@@ -1,0 +1,18 @@
+{
+  "id": "./",
+  "name": "futari · 둘만의 작은 집",
+  "short_name": "futari",
+  "description": "선택과 반응으로 둘만의 집과 추억을 쌓아요.",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#fff1f5",
+  "theme_color": "#ff5d8f",
+  "prefer_related_applications": false,
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

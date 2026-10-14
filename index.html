@@ -3,7 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>futari 💪</title>
+  <title>futari · 둘만의 작은 집</title>
+  <meta name="theme-color" content="#ff5d8f" />
+  <meta name="description" content="선택과 반응으로 둘만의 집과 추억을 쌓아요." />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="futari" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
 
   <!-- React (로컬) — Babel 불필요: 순수 JS로 작성 -->
   <script src="vendor/react.js"></script>
@@ -140,12 +148,19 @@
     .result { background:#fff7ee; padding:14px; border-radius:12px; line-height:1.8; font-size:14px; }
     .tab { min-height:48px; font-size:12px; }
     input,textarea,select { font-size:16px; }
+    [hidden] { display: none !important; }
+    .install-banner { max-width:480px; margin:0 auto; padding:10px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; background:#fff; color:#6b5560; font-size:13px; }
   </style>
 </head>
 <body>
+  <aside id="pwa-install" class="install-banner" hidden aria-label="앱 설치">
+    <span id="pwa-install-message">우리 집을 홈 화면에서 바로 열어요</span>
+    <button id="pwa-install-button" class="btn sm" type="button">앱 설치</button>
+  </aside>
   <div id="root"></div>
   <script src="games.js"></script>
   <script src="home.js"></script>
   <script src="app.js"></script>
+  <script src="pwa.js"></script>
 </body>
 </html>
