@@ -1,0 +1,6 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
+let revoked=0,attempts=[],large=true;
+class Image {constructor(){this.width=6000;this.height=4000;}set src(v){queueMicrotask(()=>this.onload());}}
+const c={window:{React:{createElement(){}}},Image,URL:{createObjectURL:()=> 'blob:test',revokeObjectURL:()=>revoked++},document:{createElement(){return {width:0,height:0,getContext:()=>({fillRect(){},drawImage(){}}),toDataURL(type,q){attempts.push({width:this.width,q});return 'data:image/jpeg;base64,'+'A'.repeat(large&&this.width>1000?400000:100000);}};}}};
+vm.runInNewContext(fs.readFileSync(require('path').join(__dirname,'../calendar.js'),'utf8'),c);
+(async()=>{const photo=c.window.FutariCalendar.photo;let result=await photo({type:'image/jpeg',size:30*1024*1024});assert(result.length<273100);assert.equal(attempts[0].width,1280);assert(attempts.some(a=>a.width<1000));assert.equal(revoked,1);await assert.rejects(photo({type:'image/jpeg',size:41*1024*1024}),/40MB/);await assert.rejects(photo({type:'text/plain',size:10}),/사진/);large=false;attempts=[];await photo({type:'image/png',size:100});assert.equal(attempts.length,1);console.log('PASS: large originals accepted, bounded JPEG output, quality/resolution fallback, input validation and object URL cleanup');})().catch(e=>{console.error(e);process.exitCode=1;});

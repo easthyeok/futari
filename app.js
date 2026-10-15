@@ -691,6 +691,7 @@
     );
   }
 
+  function mount(){
   try {
     ReactDOM.createRoot(document.getElementById('root')).render(h(App));
   } catch (err) {
@@ -698,5 +699,6 @@
       '<div style="padding:24px;font-family:sans-serif;color:#b00;"><h3>⚠️ 앱 실행 오류</h3><p>' +
       (err && err.message ? err.message : err) + '</p></div>';
     console.error(err);
-  }
+  }}
+  if(!window.indexedDB)mount();else window.FutariPreservation.archive(localStorage).catch(function(e){console.warn('Recovery archive unavailable',e);}).then(mount);
 })();

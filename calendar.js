@@ -19,7 +19,20 @@
  function review(d,id,who,form){var e=d.dates.find(function(e){return e.id===id;});if(!e||e.date>today())return false;if(!e.reviews)e.reviews={};e.reviews[who]={memo:String(form.memo||'').slice(0,1500),rating:Math.max(1,Math.min(5,Number(form.rating)||5)),photos:form.photos||[]};e.done=true;
   if(!e.memoryId){e.memoryId=window.FutariActivity.id();d.memories.push({id:e.memoryId,date:e.date,title:e.title,memo:form.memo||'',sourceId:e.id,photos:form.photos||[]});}return true;
  }
- function photo(file){return new Promise(function(resolve,reject){if(!/^image\//.test(file.type)||file.size>8*1024*1024)return reject(Error('8MB 이하의 사진을 골라주세요.'));var reader=new FileReader();reader.onerror=function(){reject(Error('사진을 읽지 못했어요.'));};reader.onload=function(){var img=new Image();img.onerror=function(){reject(Error('지원되는 사진 형식으로 다시 골라주세요.'));};img.onload=function(){var c=document.createElement('canvas'),ratio=Math.min(1,960/Math.max(img.width,img.height));c.width=img.width*ratio;c.height=img.height*ratio;c.getContext('2d').drawImage(img,0,0,c.width,c.height);resolve(c.toDataURL('image/jpeg',.72));};img.src=reader.result;};reader.readAsDataURL(file);});}
+ function photo(file){return new Promise(function(resolve,reject){
+  if(!/^image\//.test(file.type)||file.size>40*1024*1024)return reject(Error('40MB 이하의 사진을 골라주세요.'));
+  var url=URL.createObjectURL(file),img=new Image();
+  function finish(){URL.revokeObjectURL(url);}
+  img.onerror=function(){finish();reject(Error('사진을 열지 못했어요. JPG, PNG 또는 WebP 사진으로 골라주세요.'));};
+  img.onload=function(){try{var c=document.createElement('canvas'),ratio=Math.min(1,1280/Math.max(img.width,img.height)),quality=.8,result;
+   c.width=Math.max(1,Math.round(img.width*ratio));c.height=Math.max(1,Math.round(img.height*ratio));
+   var ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(img,0,0,c.width,c.height);
+   for(var step=0;step<16;step++){result=c.toDataURL('image/jpeg',quality);if(result.length<=Math.floor(200*1024/3)*4+23)break;
+    if(quality>.5)quality-=.1;else{var smaller=document.createElement('canvas');smaller.width=Math.max(1,Math.round(c.width*.8));smaller.height=Math.max(1,Math.round(c.height*.8));smaller.getContext('2d').drawImage(c,0,0,smaller.width,smaller.height);c.width=c.height=1;c=smaller;}}
+   if(result.length>Math.floor(200*1024/3)*4+23)throw Error('사진 용량을 줄이지 못했어요. 다른 사진을 골라주세요.');
+   c.width=c.height=1;finish();resolve(result);
+  }catch(e){finish();reject(e);}};img.src=url;
+ });}
  // A diary view over existing memories and dates; no destructive migration.
  function pictures(e){return Array.from(new Set([e.photo].concat(e.photos||[]).filter(Boolean)));}
  function journalRecords(d){var used={},out=[];var memories=d.memories||[];
@@ -52,7 +65,7 @@
   function open(day,e){if(uploading.current)return;lock.current=false;setError('');setForm({id:e?e.id:window.FutariActivity.id(),source:e?e.source:'memories',editing:!!e,date:day,title:e?e.title||'':'',memo:e?e.memo||'':'',photos:e?e.photos.slice():[]});}
   function field(key,value){setForm(function(current){return Object.assign({},current,{[key]:value});});}
   function addPhotos(ev){var files=Array.from(ev.target.files||[]),available=Math.max(0,6-form.photos.length);ev.target.value='';if(!files.length)return;if(files.length>available){setError('사진은 최대 6장까지 추가할 수 있어요.');return;}if(uploading.current)return;uploading.current=true;setBusy(true);setError('');var id=form.id;
-   Promise.all(files.map(photo)).then(function(photos){if(alive.current)setForm(function(current){return current&&current.id===id?Object.assign({},current,{photos:Array.from(new Set(current.photos.concat(photos)))}):current;});}).catch(function(err){if(alive.current)setError(err.message);}).finally(function(){uploading.current=false;if(alive.current)setBusy(false);});
+   files.reduce(function(chain,file){return chain.then(function(photos){return photo(file).then(function(p){photos.push(p);return photos;});});},Promise.resolve([])).then(function(photos){if(alive.current)setForm(function(current){return current&&current.id===id?Object.assign({},current,{photos:Array.from(new Set(current.photos.concat(photos)))}):current;});}).catch(function(err){if(alive.current)setError(err.message);}).finally(function(){uploading.current=false;if(alive.current)setBusy(false);});
   }
   var start=parse(month+'-01'),count=new Date(start.getFullYear(),start.getMonth()+1,0).getDate(),days=[];for(var i=0;i<start.getDay();i++)days.push(null);for(var k=1;k<=count;k++)days.push(month+'-'+String(k).padStart(2,'0'));
   var weekdays=['일','월','화','수','목','금','토'],monthEntries=all.filter(function(e){return e.date.slice(0,7)===month;});
@@ -76,5 +89,5 @@
     h('div',{className:'journal-editor-footer'},h('button',{type:'button',className:'btn ghost',disabled:busy,onClick:close},'닫기'),h('button',{type:'submit',className:'btn',disabled:busy||!form.title.trim()},busy?'사진 준비 중…':'기록 저장')))):null,
    gallery?h('div',{className:'editor-backdrop journal-lightbox'},h('section',{ref:dialog,role:'dialog','aria-modal':true,'aria-label':gallery.title+' 사진 보기',className:'journal-lightbox-sheet',onKeyDown:trap},h('div',null,h('span',null,(gallery.index+1)+' / '+gallery.photos.length),h('button',{className:'journal-icon-button','aria-label':'사진 닫기',onClick:close},'×')),h('img',{src:gallery.photos[gallery.index],alt:gallery.title+' 사진 '+(gallery.index+1)}),h('div',{className:'journal-lightbox-nav'},h('button',{disabled:gallery.index===0,'aria-label':'이전 사진',onClick:function(){setGallery(Object.assign({},gallery,{index:gallery.index-1}));}},'‹'),h('p',null,gallery.title),h('button',{disabled:gallery.index===gallery.photos.length-1,'aria-label':'다음 사진',onClick:function(){setGallery(Object.assign({},gallery,{index:gallery.index+1}));}},'›')))):null);
  }
- window.FutariCalendar={Calendar:Calendar,journalRecords:journalRecords,saveEntry:saveEntry,pictures:pictures,occurs:occurs,events:events,records:records,save:save,review:review,valid:valid,today:today,shift:shift,types:TYPES};
+ window.FutariCalendar={Calendar:Calendar,journalRecords:journalRecords,saveEntry:saveEntry,pictures:pictures,occurs:occurs,events:events,records:records,save:save,review:review,valid:valid,today:today,shift:shift,types:TYPES,photo:photo};
 })();
