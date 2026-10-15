@@ -566,13 +566,13 @@
   function TogetherPage(props) {
     var state = useState('date'), section = state[0], setSection = state[1];
     useEffect(function(){if(props.target&&(props.data.buckets||[]).some(function(b){return b.id===props.target;}))setSection('bucket');else if(props.target)setSection('date');},[props.target]);
-    var options = [['date', '📅 약속', DatePlanPage], ['bucket', '⭐ 하고 싶은 일', BucketPage]];
+    var options = [['date', '📖 기록 달력', DatePlanPage], ['bucket', '⭐ 하고 싶은 일', BucketPage]];
     return h('div', null, h('div', { className: 'seg' }, options.map(function (x) { return h('button', { key: x[0], className: section === x[0] ? 'on' : '', onClick: function () { setSection(x[0]); } }, x[1]); })), h(options.find(function (x) { return x[0] === section; })[2], props));
   }
   var TABS = [
-    { id: 'home', ico: '🏡', label: '우리 마을', comp: window.FutariHome.HomePage },
+    { id: 'home', ico: '🥚', label: '함께 키우기', comp: window.FutariHome.HomePage },
     { id: 'today', ico: '💛', label: '오늘 우리', comp: window.FutariToday.TodayPage },
-    { id: 'together', ico: '📅', label: '약속', comp: TogetherPage },
+    { id: 'together', ico: '📅', label: '우리의 날들', comp: TogetherPage },
     { id: 'games', ico: '🎲', label: '보드게임', comp: window.FutariBoardGames.BoardHub }
   ];
 
@@ -630,7 +630,7 @@
     var targetState=useState(null),target=targetState[0],setTarget=targetState[1];
     var summaryState=useState(true),showSummary=summaryState[0],setShowSummary=summaryState[1];
     function currentIdentity(){if(identity)return identity;try{return localStorage.getItem('futari_identity_'+room)||'';}catch(e){return '';}}
-    useEffect(function(){if(!document.body)return;document.body.classList.toggle('game-mode',tab==='games');document.body.classList.toggle('farm-mode',tab==='home'||tab==='today');return function(){document.body.classList.remove('game-mode','farm-mode');};},[tab]);
+    useEffect(function(){if(!document.body)return;document.body.classList.toggle('game-mode',tab==='games');document.body.classList.toggle('creature-mode',tab==='home'||tab==='today');document.body.classList.toggle('journal-mode',tab==='together');return function(){document.body.classList.remove('game-mode','creature-mode','journal-mode');};},[tab]);
     useEffect(function(){
       if(!room)return;
       var cached=cachedRoom(room);try{if(cached&&cached.data)checkedRoom(cached.data,room+'_local');}catch(e){setSyncMsg('마이그레이션 중단 · '+e.message);setLoading(false);return;}
@@ -680,7 +680,7 @@
 
     return h('div', { className: 'app' + (tab === 'games' ? ' game-app' : '') },
       syncMsg ? h('button', { type: 'button', onClick: function () { if (syncMsg.indexOf('저장 실패') === 0) retrySave(); }, style: { border: 0, cursor: 'pointer', position: 'fixed', top: 8, left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,.65)', color: '#fff', padding: '4px 12px', borderRadius: 999, fontSize: 12, zIndex: 3000 } }, syncMsg) : null,
-      h('div',{className:'app-toolbar'},h('span',null,data.settings[member]+'의 공간'),h('div',{className:'toolbar-actions'},h('button',{className:'toolbar-icon','aria-label':'우편함',onClick:function(){navigate('mail');}},'✉'),h('button',{className:'toolbar-icon','aria-label':'추억 도감',onClick:function(){navigate('catalog');}},'▦'),h('button',{className:'toolbar-icon','aria-label':'알림 '+unread.length+'개',onClick:function(){setNotifications(!notifications);setShowSummary(false);}},h('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:1.8,'aria-hidden':true},h('path',{d:'M 5 17h14l-2-3V9a5 5 0 0 0-10 0v5l-2 3z M 10 20h4 M 12 2v2'})),unread.length?h('span',{className:'notification-count'},unread.length>99?'99+':unread.length):null),h('button',{className:'btn ghost sm',onClick:function(){setTab(tab==='settings'?'home':'settings');}},'⚙'))),
+      h('div',{className:'app-toolbar'},h('span',null,data.settings[member]+'의 공간'),h('div',{className:'toolbar-actions'},h('button',{className:'toolbar-icon','aria-label':'우편함',onClick:function(){navigate('mail');}},'✉'),h('button',{className:'toolbar-icon','aria-label':'기록 달력',onClick:function(){navigate('together');}},'▦'),h('button',{className:'toolbar-icon','aria-label':'알림 '+unread.length+'개',onClick:function(){setNotifications(!notifications);setShowSummary(false);}},h('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:1.8,'aria-hidden':true},h('path',{d:'M 5 17h14l-2-3V9a5 5 0 0 0-10 0v5l-2 3z M 10 20h4 M 12 2v2'})),unread.length?h('span',{className:'notification-count'},unread.length>99?'99+':unread.length):null),h('button',{className:'btn ghost sm',onClick:function(){setTab(tab==='settings'?'home':'settings');}},'⚙'))),
       showSummary&&unread.length?h('div',{className:'activity-summary',role:'status'},h('button',{onClick:function(){setNotifications(true);setShowSummary(false);}},'새 소식 '+unread.length+'개 · 상대의 하루를 확인해요'),h('button',{'aria-label':'새 소식 요약 닫기',onClick:function(){setShowSummary(false);}},'×')):null,
       syncMsg.indexOf('저장 실패') === 0 || syncMsg.indexOf('연결 실패') === 0 ? h('div', { className: 'card', role: 'alert' }, h('p', { className: 'muted' }, '현재 화면의 변경은 이 기기에 보관되어 있어요. 필요한 내용을 설정에서 백업한 뒤 상대 변경을 불러올 수 있어요.'), h('button', { className: 'btn ghost block', onClick: recoverRemote }, '상대 변경 불러오기')) : null,
       notifications?h(window.FutariActivity.Center,pageProps):h(current.comp,pageProps),

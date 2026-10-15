@@ -74,7 +74,7 @@
     var wall=item('wall'),floor=item('floor');
     return h('div',null,h('section',{className:'house',style:{background:'linear-gradient('+(wall?wall.color:'#fff6df')+' 72%, '+(floor?floor.color:'#e4c3a5')+' 72%)'},'aria-label':'둘이 꾸민 우리 집'},h('div',{className:'house-window'},wall&&wall.id==='night'?'🌙':'☀️'),h('div',{className:'house-shelf'},'📚',item('plant')?item('plant').icon:'',item('lamp')?item('lamp').icon:''),h('div',{className:'house-sofa'},'🛋️'),h('div',{className:'house-people'},h('span',null,moods.me||'🙂'),h('span',null,moods.you||'🙂')),item('rug')?h('div',{className:'house-rug'},item('rug').icon+' 포근한 우리 집 '+item('rug').icon):null,item('pet')?h('div',{className:'house-cat'},item('pet').icon):null),h(Decorator,props));
   }
-  window.FutariHome = { Interior:function(props){return window.FutariInterior?h(window.FutariInterior.Interior,props):h(Interior,props);}, HomePage:function(props){return h(window.FutariFarm.FarmPage,props);}, Decorator: Decorator, items: ITEMS, earned: earned, balance: balance, decorate: decorate, act: act, growth: growth, question: question, day:day };
+  window.FutariHome = { Interior:function(props){return window.FutariInterior?h(window.FutariInterior.Interior,props):h(Interior,props);}, HomePage:function(props){return h(window.FutariCreatures.Page,props);}, Decorator: Decorator, items: ITEMS, earned: earned, balance: balance, decorate: decorate, act: act, growth: growth, question: question, day:day };
   function farmIncome(d){return window.FutariFarm?window.FutariFarm.income(d):0;}
   function farmSpent(d){return window.FutariFarm?window.FutariFarm.spent(d):0;}
 })();

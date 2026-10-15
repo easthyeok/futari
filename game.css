@@ -281,7 +281,7 @@ body.game-mode #root { max-width:820px; }
 .answer-text { white-space:pre-wrap; overflow-wrap:anywhere; }
 .today-outro { padding:12px 0; text-align:center; color:#a18f80; font-size:11px; }
 @media(max-width:370px){.farm-world{padding-left:12px;padding-right:12px}.farm-plots{gap:7px}.farm-plot small{font-size:7px}.farm-heading h1{font-size:24px}.farm-heading .coin-badge{font-size:11px;padding:8px}.seed-card small{font-size:7px}}
-body.farm-mode { background:linear-gradient(155deg,#edf2e2,#fbf4e6 65%,#edf0de); }
+body.creature-mode { background:linear-gradient(155deg,#edf2e2,#fbf4e6 65%,#edf0de); }
 
 /* Safari manual install guide. Above gameplay/navigation; no page reload needed. */
 .install-guide { position:fixed; inset:0; z-index:5000; display:flex; align-items:center; justify-content:center; padding:24px 18px max(24px,env(safe-area-inset-bottom)); background:#18281988; backdrop-filter:blur(5px); overflow:auto; }

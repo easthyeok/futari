@@ -24,7 +24,7 @@
       h('section',{className:'card today-question'},h('span',{className:'eyebrow'},'A QUESTION FOR US · '+(index(date)%QUESTIONS.length+1)),h('h2',{className:'title-lg'},'오늘의 질문카드'),h('blockquote',null,question(date)),h('label',{htmlFor:'today-answer'},d.settings[who]+'의 답변'),h('textarea',{id:'today-answer',value:draft,maxLength:300,rows:3,placeholder:'길지 않아도 좋아요. 오늘의 생각을 남겨주세요.',onChange:function(ev){setDraft(ev.target.value);}}),h('div',{className:'today-answer-footer'},h('small',null,draft.length+' / 300'),h('button',{className:'btn sm',disabled:!draft.trim()||draft.trim()===notes[who],onClick:function(){act('notes',draft.trim());}},notes[who]?'답변 수정':'답변 남기기 · 💛 3')),
         both?h('div',{className:'today-reveal','aria-live':'polite'},['me','you'].map(function(w){return h('div',{key:w},h('strong',null,d.settings[w]+'의 답변'),h('p',{className:'answer-text'},notes[w]));})):h('p',{className:'today-wait','aria-live':'polite'},notes[who]?'답변을 저장했어요. 상대도 답하면 함께 열려요.':'둘 다 답하면 서로의 답변을 볼 수 있어요.')),
       h('section',{className:'card'},h('h2',{className:'title-lg'},'🌿 오늘 함께한 작은 시간'),h('p',{className:'muted'},'함께 산책했거나 잠깐이라도 같이 쉬었나요? 둘 다 확인하면 💛 9 코인이 쌓여요.'),h('button',{className:'btn block',disabled:!!activity[who],onClick:function(){act('activity',true);}},activity[who]?activity[other]?'함께한 시간을 남겼어요 ✓':'상대의 확인을 기다려요 ✓':'함께했어요')),
-      h('p',{className:'today-outro'},'오늘 나눈 마음이 우리 마을의 내일이 돼요 🌱'));
+      h('p',{className:'today-outro'},'오늘 나눈 마음이 작은 생명체의 성장이 돼요 🌱'));
   }
   window.FutariToday={TodayPage:TodayPage,ChoiceCard:ChoiceCard,options:options,question:question};
 })();
