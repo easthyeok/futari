@@ -5,7 +5,7 @@
   var button = document.getElementById('recover');
   var status = document.getElementById('status');
   var link = document.getElementById('open-app');
-  var files = ['index.html','app.js','data.js','activity.js','sync-engine.js','interior.js','village.js','calendar.js','content.js','home.js','farm.js','today.js','dodge.js','board-games.js','game.css','config.js','pwa.js',
+  var files = ['index.html','app.js','preservation.js','rescue.html','rescue.js','data.js','activity.js','sync-engine.js','interior.js','village.js','calendar.js','content.js','home.js','farm.js','today.js','dodge.js','board-games.js','game.css','config.js','pwa.js',
     'manifest.webmanifest','vendor/react.js','vendor/react-dom.js','vendor/supabase.js',
     'icons/icon-192.png','icons/icon-512.png','icons/icon-maskable-512.png','icons/apple-touch-icon.png'];
   function belongsToApp(key) {
@@ -24,7 +24,7 @@
       if (!response.ok) throw new Error('배포된 파일을 받지 못했어요 (' + file + '). GitHub Pages 배포가 끝난 뒤 다시 시도해주세요.');
       if (file === 'index.html' && !(await response.clone().text()).includes('name="futari-build"')) throw new Error('아직 최신 버전이 배포되지 않았어요. GitHub Pages 배포가 끝난 뒤 다시 시도해주세요.');
       var type = response.headers.get('content-type') || '';
-      if (file !== 'index.html' && type.includes('text/html')) throw new Error('앱 파일 대신 오류 페이지가 내려왔어요. 배포 상태를 확인해주세요.');
+      if (!file.endsWith('.html') && type.includes('text/html')) throw new Error('앱 파일 대신 오류 페이지가 내려왔어요. 배포 상태를 확인해주세요.');
       return { key: new URL(file, base).href, response: response };
     }));
     var names = (await caches.keys()).filter(belongsToApp);

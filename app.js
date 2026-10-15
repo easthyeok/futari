@@ -557,7 +557,7 @@
       h('div', { className: 'card' },
         h('p', { className: 'title-lg' }, '⚠️ 초기화'),
         h('button', { className: 'btn gray block', style: { color: '#c0392b' }, onClick: resetAll }, '모든 데이터 삭제')),
-      h('section',{className:'card'},h('h2',{className:'title-lg'},'복구용 백업'),h('p',{className:'muted'},'버전 변경 전 데이터와 충돌 시 보관한 변경을 내려받을 수 있어요. 파일을 보관한 뒤 백업 가져오기로 복원해주세요.'),Object.keys(localStorage).filter(function(k){return k.indexOf('futari_backup_')===0&&(k.endsWith('_'+props.room)||k.endsWith('_'+props.room+'_local'))||k==='futari_conflict_backup_'+props.room;}).map(function(k){return h('button',{key:k,className:'btn ghost block',onClick:function(){var saved=JSON.parse(localStorage.getItem(k)),blob=new Blob([JSON.stringify(saved.data,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=k+'.json';a.click();URL.revokeObjectURL(url);}},k.indexOf('conflict')>=0?'미저장 변경 백업 내려받기':'버전 변경 전 백업 내려받기');}),h('p',{className:'muted'},'방 코드를 아는 사람이 입장할 수 있어요. 두 사람만 아는 코드를 사용해주세요.')),
+      h('section',{className:'card'},h('h2',{className:'title-lg'},'복구용 백업'),h('button',{className:'btn ghost block',onClick:function(){window.location.href=new URL('./rescue.html',window.location.href).href;}},'읽기 전용 데이터 구조 열기'),h('p',{className:'muted'},'버전 변경 전 데이터와 충돌 시 보관한 변경을 내려받을 수 있어요. 파일을 보관한 뒤 백업 가져오기로 복원해주세요.'),Object.keys(localStorage).filter(function(k){return k.indexOf('futari_backup_')===0&&(k.endsWith('_'+props.room)||k.endsWith('_'+props.room+'_local'))||k==='futari_conflict_backup_'+props.room;}).map(function(k){return h('button',{key:k,className:'btn ghost block',onClick:function(){var saved=JSON.parse(localStorage.getItem(k)),blob=new Blob([JSON.stringify(saved.data,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=k+'.json';a.click();URL.revokeObjectURL(url);}},k.indexOf('conflict')>=0?'미저장 변경 백업 내려받기':'버전 변경 전 백업 내려받기');}),h('p',{className:'muted'},'방 코드를 아는 사람이 입장할 수 있어요. 두 사람만 아는 코드를 사용해주세요.')),
       h('p', { className: 'muted center', style: { marginTop: 10 } }, 'futari 💪 v1')
     );
   }
@@ -634,7 +634,7 @@
     useEffect(function(){
       if(!room)return;
       var cached=cachedRoom(room);try{if(cached&&cached.data)checkedRoom(cached.data,room+'_local');}catch(e){setSyncMsg('마이그레이션 중단 · '+e.message);setLoading(false);return;}
-      var session=new window.FutariSync.Session({room:room,cached:cachedRoom(room),load:function(){return cloudLoad(room).then(function(d){return{data:d,version:roomVersions[room]};});},save:function(d,v){return cloudCommit(room,d,v);},persist:function(snapshot){localStorage.setItem('futari_cache_'+room,JSON.stringify(snapshot));},onChange:function(d,ack,message,pending){if(d)setData(d);if(ack)setConfirmed(ack);dirty.current=pending;setSyncMsg(message);setLoading(false);}});
+      var session=new window.FutariSync.Session({room:room,cached:cachedRoom(room),load:function(){return cloudLoad(room).then(function(d){return{data:d,version:roomVersions[room]};});},save:function(d,v){return cloudCommit(room,d,v);},persist:function(snapshot){window.FutariPreservation.write(localStorage,room,snapshot);},onChange:function(d,ack,message,pending){if(d)setData(d);if(ack)setConfirmed(ack);dirty.current=pending;setSyncMsg(message);setLoading(false);}});
       sessionRef.current=session;session.open();
       var client=getSupabase(),channel=null;
       function refresh(){if(document.visibilityState!=='hidden')session.refresh();}
@@ -652,7 +652,7 @@
       try{localStorage.setItem('futari_conflict_backup_'+room,JSON.stringify({savedAt:new Date().toISOString(),data:session.data,base:session.base,outbox:session.outbox}));}catch(e){setSyncMsg('백업 실패 · 저장 공간을 확인해주세요');return;}
       session.dirty=false;session.outbox=[];session.refresh();
     }
-    function onEnter(code, loaded) { dirty.current = false; setSyncMsg(''); setRoom(code); skipSave.current = true; setData(loaded); cacheRoom(code, loaded, false); setLoading(false);setConfirmed(null);setShowSummary(true); }
+    function onEnter(code, loaded) { var kept=window.FutariPreservation.entry(localStorage,code,loaded,roomVersions[code]);dirty.current=!!kept.pending;setSyncMsg(kept.pending?'기기에 남은 미저장 변경을 보존했어요':'');setRoom(code);skipSave.current=true;setData(normalizeData(kept.data));setLoading(false);setConfirmed(null);setShowSummary(true); }
     function leaveRoom() {
       if (!confirm(dirty.current ? '아직 저장하지 못한 변경이 있어요. 그래도 방을 나갈까요?' : '이 기기에서 방을 나갈까요? (데이터는 클라우드에 남아있어요)')) return;
       dirty.current = false; revision.current++;

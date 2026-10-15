@@ -1,0 +1,13 @@
+const fs=require('fs'),path=require('path'),vm=require('vm'),assert=require('assert/strict');
+function storage(){const map=new Map();let writes=0,full=false;return{get length(){return map.size;},key:i=>[...map.keys()][i]||null,getItem:k=>map.has(k)?map.get(k):null,setItem(k,v){if(full)throw Error('quota');writes++;map.set(k,v);},get writes(){return writes;},set full(v){full=v;},map};}
+const local=storage(),c={window:{location:{origin:'https://example.com'},navigator:{standalone:true}},document:{getElementById:()=>null},localStorage:local};
+for(const file of ['preservation.js','rescue.js'])vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../'+file),'utf8'),c);
+const P=c.window.FutariPreservation,R=c.window.FutariRescue;
+const pending={pending:true,version:'older',data:{dates:[{id:'s',title:'성실이가 등록한 약속',date:'2026-10-20'}]},base:{dates:[]},outbox:[{id:'local'}]};local.setItem('futari_cache_room',JSON.stringify(pending));
+let entered=P.entry(local,'room',{dates:[]},'newer');assert.equal(entered.data.dates[0].title,'성실이가 등록한 약속');assert.equal(entered.pending,true);assert.equal(local.getItem('futari_cache_room'),JSON.stringify(pending),'entry must not replace pending cache');
+const raw=local.getItem('futari_cache_room'),count=local.length;P.preserve(local,'room',raw,'again');assert.equal(local.length,count,'identical snapshots are not duplicated');
+P.write(local,'room',{data:{dates:[]},pending:false});assert([...local.map.values()].some(v=>{try{return JSON.parse(v).raw===raw;}catch(e){return false;}}),'replacement preserves the exact previous raw value');
+local.setItem('futari_backup_v0_room',JSON.stringify({data:{dates:[{id:'old',title:'이전 약속'}]}}));local.setItem('futari_recovery_snapshot_other',JSON.stringify({raw:'{broken'}));local.setItem('sb-secret-auth-token','not-exportable');
+const writes=local.writes,bundle=R.collect(local);assert.equal(local.writes,writes,'rescue collection is read-only');assert(!bundle.entries.some(e=>e.key==='sb-secret-auth-token'));assert(R.candidates(bundle).some(c=>c.dates.some(e=>e.id==='s')));assert(R.candidates(bundle).some(c=>c.dates.some(e=>e.id==='old')));
+local.setItem('futari_cache_full',JSON.stringify({data:{dates:[{title:'keep'}]}}));const before=local.getItem('futari_cache_full');local.full=true;assert.throws(()=>P.write(local,'full',{data:{dates:[]}}),/quota/);assert.equal(local.getItem('futari_cache_full'),before,'backup failure must not overwrite cache');
+console.log('PASS: pending calendar retained on room entry, exact raw snapshots before replacement, snapshot dedup, quota failure protection, read-only rescue, historical calendar discovery and auth-token exclusion');
