@@ -82,6 +82,7 @@
     function go(tab,id){props.navigate(tab,id);}
     return h('div',{className:'our-now'},
       h('header',{className:'today-heading'},h('p',{className:'eyebrow'},'FUTARI · OUR LITTLE MOMENTS'),h('h1',{className:'title-xl'},'우리의 지금'),h('p',{className:'muted'},'오늘은 또 어떤 이야기를 만들까요?')),
+      window.FutariFood?h(window.FutariFood.Planner,props):null,
       h('section',{className:'card now-hero'},h('span',{className:'eyebrow'},'ONE LITTLE IDEA FOR US'),h('h2',{className:'title-lg'},wish?wish.text:'우리의 다음 즐거움을 골라볼까요?'),h('p',{className:'muted'},wish?'함께 하고 싶다고 적어둔 일이에요. 이번엔 날짜를 정해볼까요?':'거창한 계획 말고, 함께 해보고 싶은 작은 일 하나부터.'),
         h('div',{className:'now-actions'},h('button',{className:'btn',onClick:function(){go('together',wish?wish.id:'wishes');}},wish?'함께할 날짜 정하기':'하고 싶은 일 적기'),wishes.length>1?h('button',{className:'btn ghost',onClick:function(){setPick(pick+1);}},'다른 아이디어'):null)),
       h('button',{className:'btn ghost block',style:{marginBottom:16},onClick:function(){go('today');}},'오늘의 대화 시작하기'),

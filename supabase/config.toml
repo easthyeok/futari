@@ -1,0 +1,6 @@
+project_id = "futari"
+
+# The handler authorizes enabled room codes and enforces a persistent request budget.
+# The app uses room codes rather than Supabase Auth JWTs.
+[functions.food-recommend]
+verify_jwt = false

@@ -5,3 +5,10 @@ serve.py
 .DS_Store
 Thumbs.db
 *.log
+
+# Server secrets and Supabase CLI state
+.env
+.env.*
+!.env.example
+supabase/.temp/
+supabase/.branches/

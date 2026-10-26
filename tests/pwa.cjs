@@ -50,7 +50,7 @@ async function worker(base) {
   assert.equal(networkCalls,4, 'failed online checks must fall back to cached shell');
   offline=false;assert.equal((await trigger({url:new URL('home.js',base).href,method:'GET',mode:'cors'})).asset,'fresh');
   offline=true;assert.equal((await trigger({url:new URL('home.js',base).href,method:'GET',mode:'cors'})).asset,'fresh','offline fallback must retain the latest online file');
-  for(const key of stores.get(prefix + 'v19').keys()) assert(!new URL(key).search,'room links must not enter cache');
+  for(const key of stores.get(prefix + 'v20').keys()) assert(!new URL(key).search,'room links must not enter cache');
   const start=new URL(manifest.start_url,new URL('manifest.webmanifest',base));
   assert.equal(start.href,base); assert.equal(new URL(manifest.scope,base).href,base);
 }

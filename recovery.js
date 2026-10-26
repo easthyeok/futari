@@ -5,7 +5,7 @@
   var button = document.getElementById('recover');
   var status = document.getElementById('status');
   var link = document.getElementById('open-app');
-  var files = ['index.html','app.js','preservation.js','rescue.html','rescue.js','data.js','activity.js','sync-engine.js','interior.js','village.js','calendar.js','content.js','home.js','farm.js','today.js','dodge.js','board-games.js','game.css','config.js','pwa.js',
+  var files = ['food.js','journal.css','index.html','app.js','preservation.js','rescue.html','rescue.js','data.js','activity.js','sync-engine.js','interior.js','village.js','calendar.js','content.js','home.js','farm.js','today.js','dodge.js','board-games.js','game.css','config.js','pwa.js',
     'manifest.webmanifest','vendor/react.js','vendor/react-dom.js','vendor/supabase.js',
     'icons/icon-192.png','icons/icon-512.png','icons/icon-maskable-512.png','icons/apple-touch-icon.png'];
   function belongsToApp(key) {
