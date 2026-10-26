@@ -1,51 +1,54 @@
-# 음식 선택과 GPT 추천
+# 음식 선택과 Gemini 추천
 
-첫 화면에서 질문 하나에 답하면 다음 질문으로 넘어갑니다. `메뉴는 아직 못 정했어` 또는 `메인은 정했어`로 시작해 고기·해산물·면/밥·분식·채소/두부·세계요리 중 방향을 정한 뒤 음식·술·요리/배달·원하는 맛을 차례로 고릅니다. 메인 예시는 종류별로 다르게 제시하며 어떤 이름이든 직접 입력할 수 있습니다. 아직 메뉴가 없으면 ‘아직 모르겠어’로 종류를 제한하지 않을 수 있습니다. 메인이 없는 경로는 음식 입력을, 배달 경로는 요리 시간 질문을 생략합니다. 재료 제외와 추가 요청은 입력 없이 넘어갈 수 있고 이전 질문·처음부터 다시 시작도 지원합니다. 마지막 답변 뒤 GPT가 설정되어 있으면 자동으로 GPT 추천을 요청하고, 미설정이면 기본 조합을 바로 보여줍니다. 한 화면에 전체 조건을 나열하지 않습니다. 기본 조합은 94개 사전 작성 메뉴에서 조건으로 필터링하고 음식/술에 맞춰 순위를 매깁니다. 다른 조합은 조건에 맞는 전체 후보를 순회합니다. GPT가 작성한 것처럼 표시하지 않습니다. 추가 문장 요청은 GPT 경로에서만 반영합니다.
+첫 화면에서 질문 하나에 답하면 다음 질문으로 넘어갑니다. 메인이 정해졌는지 묻고 음식 종류·메인 음식·술·조리 방식·맛을 차례로 고릅니다. 필요 없는 질문은 생략하며 이전 답변을 수정할 수 있습니다. 종류별 음식 예시 외에도 어떤 이름이든 직접 입력할 수 있습니다. 기본 추천은 94개 메뉴를 필터링하고 순위를 매기며 다른 추천은 전체 후보를 순회합니다.
 
-GPT는 같은 조건에 추가 요청과 최근 최대 12개의 후보 이름을 더해 새 후보 3개를 제안합니다. 기본 목록에서 선택하는 방식이 아니며 메뉴 이름은 고정 목록으로 제한하지 않습니다. 음식 종류는 아직 정하지 않은 식사를 찾을 때의 범위이며, 메인을 정한 경우 곁들임까지 같은 음식 종류로 제한하지 않습니다. 추천에서 마음에 드는 메뉴를 `하고 싶은 일`에 담을 수 있고, 기록이나 캘린더를 자동 생성하지 않습니다. 이름이 다른 식재료까지 완전히 감지하는 알레르기 판정 기능은 아닙니다.
+마지막 질문 뒤 Gemini 연결이 설정되어 있으면 추천을 요청합니다. 추가 문장·제외 재료·최근 후보 최대 12개도 함께 전달합니다. Gemini는 기본 목록에 갇히지 않고 서로 다른 메뉴 3개를 제안합니다. 마음에 드는 메뉴는 ‘하고 싶은 일’에 담을 수 있고 캘린더·기록을 자동 생성하지 않습니다. 재료 필터는 이름이 다른 모든 식재료를 감지하는 알레르기 판정 기능은 아닙니다.
 
-## 현재 동작 범위
+## 현재 상태
 
-- GitHub Pages만 배포해도 기본 조합은 동작합니다. `food.js`는 오프라인 앱 셸에도 포함됩니다.
-- GPT 연결용 화면·서버 코드는 포함했지만 서버 배포·API 키 설정은 별도입니다. 이 저장소에서 실제 API 키로 호출하거나 운영 DB에 SQL을 적용하지 않았습니다.
-- `config.js`의 `FOOD_AI_ENABLED`는 기본 `false`입니다. 준비되지 않은 상태에서 GPT 응답을 가장하거나 유료 요청을 보내지 않습니다.
-- 미설정·오프라인·실패·제한 초과 시 기본 후보를 유지합니다. 선택 조건이 바뀌면 이전 요청 결과를 버립니다.
+- 화면과 서버 코드를 Gemini 전용으로 변경했습니다. 실제 서버 배포·비밀 등록·실제 모델 호출은 아직 하지 않았습니다.
+- 기본 추천은 서버 없이 동작하고 오프라인 셸에도 포함됩니다. `FOOD_AI_ENABLED`는 실제 설정 완료 전까지 `false`입니다.
+- API 경로는 `/functions/v1/food-recommend-gemini`입니다. 예전 OpenAI 함수 `/food-recommend`를 호출하지 않습니다. OpenAI 키를 읽거나 다른 AI/모델로 자동 전환하는 코드도 없습니다.
+- 한도 초과·실패·응답 지연 때 기존 기본 추천을 유지하거나 기본 추천으로 전환합니다. 자동 재시도하지 않습니다. 선택 조건을 바꾸면 오래된 요청 결과를 버립니다.
 
-## 서버 설정
+## 무료로 시작하는 설정 순서
 
-기존 Supabase 프로젝트에 Edge Function 하나와 전용 사용량 테이블/함수를 추가합니다. 기존 `rooms.data`를 읽거나 수정하지 않습니다. 브라우저의 공개 Supabase 키는 OpenAI 키를 대신할 수 없습니다.
-
-1. Supabase SQL Editor에서 [사용량 SQL](../supabase/migrations/202610260001_food_recommendation_quota.sql)을 실행합니다. 이 파일만 적용하면 됩니다. 기존 DB에 대해 전체 초기화나 새 프로젝트 생성은 하지 않습니다.
-2. Supabase Dashboard의 Edge Function Secrets에 아래 항목을 설정합니다. 실제 비밀 값은 `config.js`·Git·채팅에 넣지 않습니다.
+1. [Google AI Studio](https://aistudio.google.com/)에서 **무료 등급 프로젝트**의 Gemini API 키를 발급합니다. Google Cloud Billing이 연결된 유료 프로젝트의 키는 사용하지 않습니다. AI Studio에서 해당 프로젝트의 요금 등급과 모델 사용 가능 여부를 확인하세요.
+2. 기존 Supabase 프로젝트의 SQL Editor에서 [사용량 SQL](../supabase/migrations/202610260001_food_recommendation_quota.sql)을 실행합니다. 이미 실행했다면 다시 할 필요 없습니다. 기존 `rooms.data`는 읽거나 수정하지 않습니다.
+3. Supabase Dashboard → Edge Functions → Secrets에 다음을 저장합니다. 실제 키는 채팅·Git·`config.js`에 넣지 않습니다.
 
 | 서버 환경 변수 | 값 |
 | --- | --- |
-| `OPENAI_API_KEY` | OpenAI 프로젝트 API 키 |
-| `OPENAI_MODEL` | 계정에서 사용 가능한 Responses + Structured Outputs 지원 모델 ID |
-| `FOOD_ALLOWED_ROOMS` | 허용할 기존 방 코드의 JSON 배열. 예: `["실제 방 코드"]` |
-| `FOOD_ALLOWED_ORIGINS` | 배포 웹앱 origin의 JSON 배열. 기본 예: `["https://easthyeok.github.io"]` |
+| `GEMINI_API_KEY` | Google AI Studio에서 발급한 무료 프로젝트 키 |
+| `GEMINI_MODEL` | `gemini-3.5-flash-lite` (생략해도 이 모델 사용) |
+| `FOOD_ALLOWED_ROOMS` | 허용할 방 코드의 JSON 배열. 예: `["실제 방 코드"]` |
+| `FOOD_ALLOWED_ORIGINS` | `["https://easthyeok.github.io"]` |
 
-`SUPABASE_URL`·`SUPABASE_SERVICE_ROLE_KEY`는 Edge Function 런타임이 주입하는 서버 환경 변수를 사용합니다. service-role 키는 브라우저로 보내지 않습니다. 로컬 개발에는 `supabase/functions/.env.example`을 `.env`로 복사해 사용할 수 있으며 `.env`는 Git에서 제외합니다.
+서버 코드는 현재 무료 입력·출력이 제공되는 이 모델 ID만 허용합니다. **모델 ID 제한만으로 Google 프로젝트의 무료 등급을 검증하는 것은 아닙니다.** 유료 프로젝트 키를 넣으면 같은 모델도 과금될 수 있으므로 프로젝트 요금 등급 확인이 필요합니다. 무료 제공 모델·한도는 변경될 수 있으며 계정의 실제 제한이 적용됩니다.
 
-3. Supabase CLI를 사용할 수 있는 환경에서 저장소 루트에서 배포합니다.
+`SUPABASE_URL`과 `SUPABASE_SERVICE_ROLE_KEY`는 Supabase Edge Function이 주입하는 서버 환경 변수를 사용합니다. 서비스 키는 브라우저로 보내지 않습니다. 로컬 환경 파일은 `supabase/functions/.env.example`에서 `.env`로 복사할 수 있고 `.env`는 Git에서 제외됩니다.
+
+4. Supabase CLI에 로그인한 환경에서 저장소 루트에서 서버 함수를 배포합니다.
 
 ```sh
-supabase functions deploy food-recommend --project-ref xfnbrxltbvnxtkuatqxo
+supabase functions deploy food-recommend-gemini --project-ref xfnbrxltbvnxtkuatqxo
 ```
 
-`supabase/config.toml`의 해당 함수만 `verify_jwt = false`입니다. 앱은 현재 Supabase Auth 대신 방 코드를 사용하므로 함수 내부에서 허용 방 목록을 검사합니다. 빈 허용 목록이나 미설정 키/모델은 호출을 허용하지 않습니다. 이 방식은 기존 방 코드의 비밀성에 의존하며 강한 사용자 인증을 추가한 것은 아닙니다. 허용 origin 검사만으로 사용자를 인증하지 않습니다.
+기존 OpenAI 함수는 이 배포로 갱신되지 않고 새 Gemini 함수가 생깁니다. 예전 함수가 실제 배포되어 있다면 별도로 관리/삭제할 수 있으나 앱은 그 주소를 사용하지 않습니다. OpenAI 비밀은 새 함수에서 읽지 않으므로 설정할 필요 없습니다.
 
-4. 서버를 설정한 뒤 `config.js`에서 `FOOD_AI_ENABLED: true`로 바꿔 Pages에 반영합니다. API 주소는 기존 `SUPABASE_URL`의 `/functions/v1/food-recommend`로 계산됩니다.
-5. 실제 앱에서 GPT 후보와 재요청을 확인합니다. 잘못된 방 코드, 허용하지 않은 origin, 키 미설정, 사용량 한도 오류도 확인합니다.
+이 함수는 `supabase/config.toml`에서 `verify_jwt = false`로 설정합니다. 앱은 현재 Supabase Auth 대신 방 코드를 사용하므로 함수 내부의 허용 방 목록과 사용량 제한으로 호출을 관리합니다. 빈 허용 목록·잘못된 모델·미설정 키는 요청을 거절합니다. 기존 방 코드의 비밀성에 의존하며 강한 사용자 인증을 추가한 것은 아닙니다. CORS 검사를 사용자 인증으로 취급하지 않습니다.
 
-## 요청과 비용 범위
+5. 서버를 설정한 뒤 `config.js`의 `FOOD_AI_ENABLED: true`를 반영합니다. 앱에서 선택을 마치면 Gemini에 물어보고 ‘Gemini가 고른 조합’으로 표시하는지 확인합니다. 429/미설정/오류에는 기본 조합으로 전환하는지도 확인합니다.
 
-- OpenAI에는 음식 조건·추가 요청·이전 후보 이름만 전달합니다. 방 코드·일기·사진·전체 공유 데이터를 전송하지 않습니다.
-- Responses API의 Structured Outputs로 후보 3개의 `name`·`reason`·`preparation`을 받으며 서버와 화면에서 다시 형식을 검증합니다. `store: false`, 출력 한도 1,400토큰, 서버 시간 제한 20초를 사용합니다.
-- 모델은 서버에서만 설정합니다. 브라우저 요청으로 모델·출력 한도·API 목적지를 바꿀 수 없습니다.
-- UTC 날짜 기준 방당 20회, 전체 100회, 같은 방 10초 간격을 DB 트랜잭션에서 제한합니다. 사용량 저장소를 사용할 수 없으면 GPT 호출을 중단합니다.
-- 허용된 요청은 모델 실패에도 한도를 소비합니다. 제한은 반복 과금을 줄이는 장치이며 원화 기준 지출 상한은 아닙니다. 단가는 선택한 모델에 따라 달라집니다.
-- 모델 출력은 실행하거나 HTML로 삽입하지 않고 텍스트로 렌더링합니다.
+## 요청·한도·개인정보
+
+- Google에는 선택한 음식 조건·추가 요청·이전 메뉴 이름만 보냅니다. 방 코드·일기·사진·전체 공유 데이터는 보내지 않습니다.
+- Google 공식 문서에서 `gemini-3.5-flash-lite`는 무료 등급의 입력·출력이 무료로 표시됩니다. 무료 한도·사용 가능 여부는 프로젝트에 따라 확인해야 합니다. 무료 등급은 내용이 Google 제품 개선에 사용될 수 있습니다.
+- 새 서버는 Google `generateContent` API에 키를 헤더로 전달합니다. URL에 키를 넣지 않습니다. 출력은 JSON Schema로 요청하고 서버/화면에서 메뉴 개수·문자열·중복을 다시 검증합니다. 사고 과정으로 표시된 텍스트는 메뉴로 파싱하지 않습니다.
+- 모델은 서버에서 지정한 ID만 허용합니다. 브라우저 요청으로 모델·키·API 주소를 바꿀 수 없습니다. 웹 검색·지도·다른 유료 도구를 요청하지 않습니다.
+- 출력 한도 1,400토큰·20초 타임아웃을 적용합니다. 한도나 실패에도 유료 제공자로 전환하거나 자동 재시도하지 않습니다.
+- 자체 제한은 UTC 날짜 기준 방당 20회·전체 100회·같은 방 10초 간격입니다. Gemini의 실제 무료 한도가 더 작으면 먼저 제한될 수 있습니다. 요청 실패도 자체 한도를 소비합니다. 사용량 DB가 작동하지 않으면 AI 호출을 중단합니다.
+- 이는 **Gemini API 무료 등급을 쓰는 설정**이며 Supabase 등 외부 서비스 전체 비용을 보증하는 것은 아닙니다. 외부 서비스는 각 계정의 요금제와 한도를 따릅니다.
 
 ## 검증
 
@@ -57,6 +60,6 @@ node tests/pwa.cjs
 node tests/recovery.cjs
 ```
 
-질문별 자동 전환·상황별 질문 생략·이전 질문의 답 유지·재시작·음식 필터·조합 순위·다른 후보·저장 중복 방지·추가 조건 전달·중복 클릭·오래된 응답 차단·실패 시 기존 후보 보존·입력 제한·허용 방/origin·사용량 저장소 실패·구조화 응답·상위 API 오류를 모의 응답으로 검증합니다. 운영 PostgreSQL에서 사용량 SQL 실행, Supabase Deno 런타임 배포, 실제 모델 호출, 브라우저 화면 확인은 별도입니다.
+화면 전환·분기·답 유지·재시작·94개 기본 후보·저장 중복 방지·Gemini 전달 데이터·중복 클릭·오래된 응답·무료 한도/오류의 기본 추천 전환·입력 제한·허용 방/origin·사용량 DB 실패·Gemini JSON 응답/차단/미완성 응답·키 노출 방지를 모의 응답으로 검증합니다. 운영 SQL·Deno 런타임·실제 모델·실제 브라우저는 별도 확인이 필요합니다.
 
-공식 문서: [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses), [Supabase 함수 설정](https://supabase.com/docs/guides/functions/function-configuration), [Supabase 서버 환경 변수](https://supabase.com/docs/guides/functions/secrets).
+공식 문서: [Gemini 무료·유료 가격](https://ai.google.dev/gemini-api/docs/pricing), [Gemini 키 관리](https://ai.google.dev/gemini-api/docs/api-key), [구조화 출력](https://ai.google.dev/gemini-api/docs/generate-content/structured-output), [Supabase 서버 비밀](https://supabase.com/docs/guides/functions/secrets).

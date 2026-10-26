@@ -6,8 +6,8 @@ function list(name: string): string[] {
 const base = Deno.env.get('SUPABASE_URL');
 const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 Deno.serve(createHandler({
-  apiKey: Deno.env.get('OPENAI_API_KEY'),
-  model: Deno.env.get('OPENAI_MODEL'),
+  apiKey: Deno.env.get('GEMINI_API_KEY'),
+  model: Deno.env.get('GEMINI_MODEL') || 'gemini-3.5-flash-lite',
   allowedRooms: list('FOOD_ALLOWED_ROOMS'),
   allowedOrigins: list('FOOD_ALLOWED_ORIGINS'),
   consumeQuota: base && serviceKey ? async (roomHash: string, signal: AbortSignal) => {
