@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHandler, validateInput, validOutput } from '../supabase/functions/food-recommend/handler.mjs';
-const form={mode:'pair',main:'과메기',drink:'막걸리',method:'직접 요리',taste:'국물',simple:true,exclude:'오이',note:'따뜻한 국물도 하나'};
+const form={mode:'pair',category:'상관없음',main:'과메기',drink:'막걸리',method:'직접 요리',taste:'국물',simple:true,exclude:'오이',note:'따뜻한 국물도 하나'};
 const items=[{name:'바지락 술찜',reason:'따뜻하게 곁들여요',preparation:'약 20분'}, {name:'어묵탕',reason:'맑은 국물',preparation:'약 15분'}, {name:'콩나물국',reason:'가벼운 국물',preparation:'약 15분'}];
 let calls=[],quotas=[],permitted=true,quotaThrows=false,kind='ok';
 const config={apiKey:'server-only-test-key',model:'configured-model',allowedRooms:['room'],allowedOrigins:['https://example.com'],consumeQuota:async hash=>{quotas.push(hash);if(quotaThrows)throw Error('secret diagnostics');return permitted;},fetcher:async(url,options)=>{
@@ -12,7 +12,7 @@ const config={apiKey:'server-only-test-key',model:'configured-model',allowedRoom
 }};
 const handler=createHandler(config);
 function request(body={room:'room',form,avoid:['골뱅이소면']},options={}){return new Request('https://edge.example/food-recommend',{method:options.method||'POST',headers:{Origin:options.origin===undefined?'https://example.com':options.origin,'Content-Type':options.type||'application/json'},body:options.method==='GET'||options.method==='OPTIONS'?undefined:typeof body==='string'?body:JSON.stringify(body)});}
-assert(validateInput({room:'room',form}));assert.equal(validateInput({room:'room',form:{...form,note:'x'.repeat(401)}}),null);assert.equal(validateInput({room:'room',form:{...form,drink:'arbitrary'}}),null);assert.equal(validateInput({room:'room',form,avoid:['x'.repeat(81)]}),null);assert.equal(validateInput({room:'room',form:{...form,simple:'yes'}}),null);assert(validOutput({items}));assert(!validOutput({items:[items[0],items[0],items[0]]}));
+assert(validateInput({room:'room',form}));assert.equal(validateInput({room:'room',form:{...form,note:'x'.repeat(401)}}),null);assert.equal(validateInput({room:'room',form:{...form,drink:'arbitrary'}}),null);assert.equal(validateInput({room:'room',form,avoid:['x'.repeat(81)]}),null);assert.equal(validateInput({room:'room',form:{...form,simple:'yes'}}),null);assert(validateInput({room:'room',form:{...form,main:'부야베스와 뇨키',category:'세계요리'}}));assert.equal(validateInput({room:'room',form:{...form,category:'invalid'}}),null);assert.equal(validateInput({room:'room',form,avoid:Array(13).fill('menu')}),null);assert(validOutput({items}));assert(!validOutput({items:[items[0],items[0],items[0]]}));
 assert.equal((await handler(request({}, {method:'OPTIONS'}))).status,204);
 assert.equal((await handler(request({}, {method:'GET'}))).status,405);
 assert.equal((await handler(request(undefined,{origin:'https://evil.example'}))).status,403);
