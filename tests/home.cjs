@@ -26,3 +26,5 @@ assert(home.decorate(d,'flowers'));assert.equal(d.house.equipped.plant,'flowers'
 const restored=JSON.parse(JSON.stringify(d));assert.equal(home.balance(restored),home.balance(d));assert.equal(restored.house.equipped.plant,'flowers');
 assert(home.decorate(restored,'plant'));assert.equal(restored.house.owned.length,2);
 console.log('PASS: legacy activity credit, daily bonus, limited match rewards, affordability, duplicate purchases, shared slots, inventory and JSON persistence');
+
+let modern={settings:{me:'A',you:'B'},memories:[],together:{},gameResults:[]};for(const who of ['me','you'])for(const [kind,value] of [['moods','😊'],['moment',0],['imagine',1],['notes','답']])home.act(modern,date,who,kind,value);assert.equal(home.earned(modern),36);const saved=JSON.stringify(modern);home.act(modern,date,'me','moment',3);assert.equal(JSON.stringify(modern),saved);home.act(modern,date,'me','imagine',99);assert.equal(JSON.stringify(modern),saved);

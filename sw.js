@@ -2,7 +2,7 @@
 'use strict';
 const BASE = new URL('./', self.location.href);
 const CACHE_PREFIX = 'futari-shell-' + encodeURIComponent(BASE.pathname) + '-';
-const CACHE_NAME = CACHE_PREFIX + 'v15';
+const CACHE_NAME = CACHE_PREFIX + 'v16';
 const SHELL = [
   'journal.css', 'creatures.js', 'creatures.css', 'index.html', 'app.js', 'preservation.js', 'rescue.html', 'rescue.js', 'data.js','activity.js','sync-engine.js','interior.js','village.js','calendar.js','content.js','home.js', 'farm.js', 'today.js', 'dodge.js', 'board-games.js', 'game.css', 'config.js', 'pwa.js',
   'manifest.webmanifest', 'vendor/react.js', 'vendor/react-dom.js', 'vendor/supabase.js',

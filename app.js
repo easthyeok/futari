@@ -571,12 +571,12 @@
   /* ===== 메인 App ===== */
   function TogetherPage(props) {
     var state = useState('date'), section = state[0], setSection = state[1];
-    useEffect(function(){if(props.target&&(props.data.buckets||[]).some(function(b){return b.id===props.target;}))setSection('bucket');else if(props.target)setSection('date');},[props.target]);
+    useEffect(function(){if(props.target==='wishes')setSection('bucket');else if(props.target&&(props.data.buckets||[]).some(function(b){return b.id===props.target;}))setSection('bucket');else if(props.target)setSection('date');},[props.target]);
     var options = [['date', '📖 기록 달력', DatePlanPage], ['bucket', '⭐ 하고 싶은 일', BucketPage]];
     return h('div', null, h('div', { className: 'seg' }, options.map(function (x) { return h('button', { key: x[0], className: section === x[0] ? 'on' : '', onClick: function () { setSection(x[0]); } }, x[1]); })), h(options.find(function (x) { return x[0] === section; })[2], Object.assign({},props,{onRecorded:function(){setSection('date');}})));
   }
   var TABS = [
-    { id: 'home', ico: '🥚', label: '함께 키우기', comp: window.FutariHome.HomePage },
+    { id: 'home', ico: '🏡', label: '우리의 지금', comp: window.FutariHome.HomePage },
     { id: 'today', ico: '💛', label: '오늘 우리', comp: window.FutariToday.TodayPage },
     { id: 'together', ico: '📅', label: '우리의 날들', comp: TogetherPage },
     { id: 'games', ico: '🎲', label: '보드게임', comp: window.FutariBoardGames.BoardHub }
