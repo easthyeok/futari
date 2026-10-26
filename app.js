@@ -72,7 +72,7 @@
 
   var roomVersions = {};
   function cacheRoom(code, data, pending) { try { localStorage.setItem('futari_cache_' + code, JSON.stringify({ data: data, pending: pending, version: roomVersions[code] })); } catch (e) {} }
-  function cachedRoom(code) { try { return JSON.parse(localStorage.getItem('futari_cache_' + code) || 'null'); } catch (e) { return null; } }
+  function cachedRoom(code) { try { return window.FutariPreservation.cached(localStorage,code); } catch (e) { return null; } }
   var sb = null;
   function getSupabase() {
     if (sb) return sb;
@@ -328,19 +328,24 @@
       setText(''); setOpen(false);
     }
     function toggle(id) { update(function (d) { var b = d.buckets.find(function (x) { return x.id === id; }); if (b) b.done = !b.done; }); }
-    function del(id) { if (confirm('삭제할까요?')) update(function (d) { d.buckets = d.buckets.filter(function (b) { return b.id !== id; }); }); }
+    function del(id) { if (confirm('하고 싶은 일과 연결된 날짜를 삭제할까요? 남긴 기록은 보존돼요.')) update(function (d) { var item=d.buckets.find(function(b){return b.id===id;});if(item&&item.calendarId){var linked=d.dates.find(function(e){return e.id===item.calendarId;});if(linked&&!linked.journalEdited&&!linked.memoryId&&!linked.reviews&&!linked.done)window.FutariCalendar.deleteEntry(d,'dates',item.calendarId);}d.buckets = d.buckets.filter(function (b) { return b.id !== id; }); }); }
     function toMemory(b) {
-      if (b.memoryId || !confirm('달성한 걸 추억으로 보낼까요?')) return;
-      update(function (d) {
-        d.memories.push({ id: uid(), date: todayStr(), title: '✅ ' + b.text, memo: '버킷리스트 달성!', photo: '' });
-        var item = d.buckets.find(function (x) { return x.id === b.id; }); if (item) item.memoryId = d.memories[d.memories.length - 1].id;
+      var day=prompt('함께한 날짜를 골라주세요 (YYYY-MM-DD)',todayStr());
+      if(day===null)return;if(!window.FutariCalendar.valid(day)){alert('날짜를 YYYY-MM-DD 형식으로 입력해주세요.');return;}
+      update(function(d){var item=d.buckets.find(function(x){return x.id===b.id;});if(!item)return;
+        var planned=d.dates.find(function(e){return e.id===item.calendarId;});
+        var existing=d.memories.find(function(m){return m.id===item.memoryId;});
+        if(planned){planned.date=day;planned.done=true;}
+        else if(existing)existing.date=day;
+        else{item.memoryId=uid();d.memories.push({id:item.memoryId,date:day,title:item.text,memo:'함께 하고 싶었던 일을 이룬 날',photos:[]});}
+        item.done=true;
       });
-      alert('추억 탭에 저장했어요 💕');
+      if(props.onRecorded)props.onRecorded();
     }
 
     return h('div', null,
       h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 } },
-        h('h2', { className: 'title-xl' }, '⭐ 버킷리스트'),
+        h('h2', { className: 'title-xl' }, '⭐ 함께 하고 싶은 일'),
         h('button', { className: 'btn sm', onClick: function () { formId.current=uid();setOpen(true); } }, '+ 추가')),
       h('div', { className: 'card' },
         h('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: 6 } },
@@ -358,8 +363,9 @@
               return h('div', { key: b.id, className: 'item', style: { display: 'flex', alignItems: 'center', gap: 10 } },
                 h('input', { type: 'checkbox', style: { width: 22, flex: 'none' }, checked: b.done, onChange: function () { toggle(b.id); } }),
                 h('span', { style: { flex: 1, textDecoration: b.done ? 'line-through' : 'none', color: b.done ? '#bba' : '#3a2b33' } }, b.text),
-                h('button',{className:'btn ghost sm',onClick:function(){var day=prompt('언제로 정할까요? YYYY-MM-DD',todayStr());if(!window.FutariCalendar.valid(day))return;update(function(d){var item=d.buckets.find(function(v){return v.id===b.id;});if(!item||item.calendarId)return;item.calendarId=uid();d.dates.push({id:item.calendarId,date:day,title:item.text,memo:'위시리스트에서 만든 일정',kind:item.category==='여행'?'travel':'date',allDay:true,status:'accepted',owner:props.member});});}},'날짜 정하기'),
-                b.done && !b.memoryId ? h('button', { className: 'btn ghost sm', style: { flex: 'none' }, onClick: function () { toMemory(b); } }, '추억으로') : null,
+                h('span',{className:'bucket-actions'},
+                  h('label',null,'함께할 날짜',h('input',{type:'date',value:(data.dates.find(function(e){return e.id===b.calendarId;})||{}).date||'',onChange:function(ev){var day=ev.target.value;if(day&&!window.FutariCalendar.valid(day))return;update(function(d){var item=d.buckets.find(function(x){return x.id===b.id;});if(!item)return;var existing=d.dates.find(function(e){return e.id===item.calendarId;});if(!day){if(existing)window.FutariCalendar.deleteEntry(d,'dates',existing.id);return;}if(existing)existing.date=day;else{item.calendarId=uid();d.dates.push({id:item.calendarId,date:day,title:item.text,memo:'함께 하고 싶은 일',kind:item.category==='여행'?'travel':'date',allDay:true,status:'accepted',owner:props.member});}});}})),
+                  h('button',{className:'btn ghost sm',onClick:function(){toMemory(b);}},b.memoryId?'기록 날짜 변경':'이룬 날 기록하기')),
                 h('span', { className: 'link', style: { flex: 'none' }, onClick: function () { del(b.id); } }, '✕'));
             }));
         }),
@@ -567,7 +573,7 @@
     var state = useState('date'), section = state[0], setSection = state[1];
     useEffect(function(){if(props.target&&(props.data.buckets||[]).some(function(b){return b.id===props.target;}))setSection('bucket');else if(props.target)setSection('date');},[props.target]);
     var options = [['date', '📖 기록 달력', DatePlanPage], ['bucket', '⭐ 하고 싶은 일', BucketPage]];
-    return h('div', null, h('div', { className: 'seg' }, options.map(function (x) { return h('button', { key: x[0], className: section === x[0] ? 'on' : '', onClick: function () { setSection(x[0]); } }, x[1]); })), h(options.find(function (x) { return x[0] === section; })[2], props));
+    return h('div', null, h('div', { className: 'seg' }, options.map(function (x) { return h('button', { key: x[0], className: section === x[0] ? 'on' : '', onClick: function () { setSection(x[0]); } }, x[1]); })), h(options.find(function (x) { return x[0] === section; })[2], Object.assign({},props,{onRecorded:function(){setSection('date');}})));
   }
   var TABS = [
     { id: 'home', ico: '🥚', label: '함께 키우기', comp: window.FutariHome.HomePage },
@@ -634,7 +640,7 @@
     useEffect(function(){
       if(!room)return;
       var cached=cachedRoom(room);try{if(cached&&cached.data)checkedRoom(cached.data,room+'_local');}catch(e){setSyncMsg('마이그레이션 중단 · '+e.message);setLoading(false);return;}
-      var session=new window.FutariSync.Session({room:room,cached:cachedRoom(room),load:function(){return cloudLoad(room).then(function(d){return{data:d,version:roomVersions[room]};});},save:function(d,v){return cloudCommit(room,d,v);},persist:function(snapshot){window.FutariPreservation.write(localStorage,room,snapshot);},onChange:function(d,ack,message,pending){if(d)setData(d);if(ack)setConfirmed(ack);dirty.current=pending;setSyncMsg(message);setLoading(false);}});
+      var session=new window.FutariSync.Session({room:room,cached:cachedRoom(room),load:function(){return cloudLoad(room).then(function(d){return{data:d,version:roomVersions[room]};});},save:function(d,v){return cloudCommit(room,d,v);},persist:function(snapshot){return window.FutariPreservation.persist(localStorage,room,snapshot);},onChange:function(d,ack,message,pending){if(d)setData(d);if(ack)setConfirmed(ack);dirty.current=pending;setSyncMsg(message);setLoading(false);}});
       sessionRef.current=session;session.open();
       var client=getSupabase(),channel=null;
       function refresh(){if(document.visibilityState!=='hidden')session.refresh();}
@@ -700,5 +706,5 @@
       (err && err.message ? err.message : err) + '</p></div>';
     console.error(err);
   }}
-  if(!window.indexedDB)mount();else window.FutariPreservation.archive(localStorage).catch(function(e){console.warn('Recovery archive unavailable',e);}).then(mount);
+  if(!window.indexedDB)mount();else window.FutariPreservation.hydrate().then(function(){return window.FutariPreservation.archive(localStorage);}).catch(function(e){console.warn('Recovery archive unavailable',e);}).then(mount);
 })();

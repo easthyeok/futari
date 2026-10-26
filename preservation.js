@@ -8,7 +8,7 @@
  function write(storage,room,next){var key='futari_cache_'+room,raw=storage.getItem(key),serialized=JSON.stringify(next);
   if(raw&&raw!==serialized){var previous=JSON.parse(raw);var continued=previous.pending&&next.pending&&(previous.outbox||[]).every(function(tx){return(next.outbox||[]).some(function(n){return n.id===tx.id;});});if(previous.pending&&!continued&&next.pending!==false)preserve(storage,room,raw,'before-cache-replacement');}storage.setItem(key,serialized);
  }
- function entry(storage,room,loaded,version){var key='futari_cache_'+room,raw=storage.getItem(key);if(raw){var existing;try{existing=JSON.parse(raw);}catch(e){preserve(storage,room,raw,'unreadable-cache');throw Error('기존 기기 저장값을 확인할 수 없어요. 읽기 전용 복구 화면에서 백업해주세요.');}
+ function entry(storage,room,loaded,version){if(deviceCaches[room])return deviceCaches[room];var key='futari_cache_'+room,raw=storage.getItem(key);if(raw){var existing;try{existing=JSON.parse(raw);}catch(e){preserve(storage,room,raw,'unreadable-cache');throw Error('기존 기기 저장값을 확인할 수 없어요. 읽기 전용 복구 화면에서 백업해주세요.');}
    // Entry retains pending data verbatim; confirmed caches can be read from the server.
    // Pending local edits must be handed to the sync session, never replaced by a login read.
    if(existing.pending)return existing;
@@ -29,5 +29,15 @@
   };
  });}
  function archived(){return new Promise(function(resolve,reject){if(!window.indexedDB)return resolve([]);var req=window.indexedDB.open('futari-recovery',1);req.onupgradeneeded=function(){req.result.createObjectStore('snapshots',{keyPath:'key'});};req.onerror=function(){reject(req.error);};req.onsuccess=function(){var db=req.result,tx=db.transaction('snapshots','readonly'),r=tx.objectStore('snapshots').getAll();tx.oncomplete=function(){db.close();resolve(r.result);};tx.onabort=function(){db.close();reject(tx.error);};};});}
- window.FutariPreservation={preserve:preserve,write:write,entry:entry,archive:archive,archived:archived};
+ var deviceCaches={},largeRooms={},queue=Promise.resolve();
+ function cacheDB(){return new Promise(function(resolve,reject){if(!window.indexedDB)return reject(Error('기기 저장소를 사용할 수 없어요'));var r=window.indexedDB.open('futari-device-cache',1);r.onupgradeneeded=function(){r.result.createObjectStore('rooms');};r.onerror=function(){reject(r.error);};r.onsuccess=function(){resolve(r.result);};});}
+ function hydrate(){return cacheDB().then(function(db){return new Promise(function(resolve,reject){var tx=db.transaction('rooms','readonly'),r=tx.objectStore('rooms').openCursor();r.onsuccess=function(){var cursor=r.result;if(cursor){deviceCaches[cursor.key]=cursor.value;cursor.continue();}};tx.oncomplete=function(){db.close();resolve();};tx.onabort=function(){db.close();reject(tx.error);};});});}
+ function cached(storage,room){return deviceCaches[room]||JSON.parse(storage.getItem('futari_cache_'+room)||'null');}
+ function persist(storage,room,next){
+  // Confirmed snapshots need only one copy; pending changes retain their merge base.
+  var compact=Object.assign({},next);if(!next.pending)delete compact.base;
+  if(!deviceCaches[room]&&!largeRooms[room]){try{write(storage,room,compact);return Promise.resolve();}catch(e){if(!window.indexedDB)return Promise.reject(e);}}
+  largeRooms[room]=true;var task=queue.catch(function(){}).then(function(){return cacheDB();}).then(function(db){return new Promise(function(resolve,reject){var tx=db.transaction('rooms','readwrite');tx.objectStore('rooms').put(compact,room);tx.oncomplete=function(){deviceCaches[room]=compact;db.close();resolve();};tx.onabort=function(){db.close();reject(tx.error);};});});queue=task;return task;
+ }
+ window.FutariPreservation={cached:cached,persist:persist,hydrate:hydrate,preserve:preserve,write:write,entry:entry,archive:archive,archived:archived};
 })();

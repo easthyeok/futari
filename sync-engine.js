@@ -1,6 +1,10 @@
 (function(){'use strict';var D=window.FutariData;
  function Session(opts){this.o=opts;this.base=opts.cached&&opts.cached.base?D.migrate(opts.cached.base):null;this.data=opts.cached&&opts.cached.data?D.migrate(opts.cached.data):null;this.version=opts.cached&&opts.cached.version;this.confirmed=this.base;this.dirty=!!(opts.cached&&opts.cached.pending);this.outbox=opts.cached&&opts.cached.outbox||[];this.running=false;this.closed=false;this.timer=null;}
- Session.prototype.emit=function(message){this.lastMessage=message;try{this.o.persist({data:this.data,base:this.base,version:this.version,pending:this.dirty,outbox:this.outbox});}catch(e){message='기기 백업 실패 · 저장 공간을 확인해주세요. '+message;}this.o.onChange(this.data,this.confirmed,message,this.dirty);};
+ Session.prototype.emit=function(message){this.lastMessage=message;var self=this;
+  function failed(){if(!self.closed&&self.dirty)self.o.onChange(self.data,self.confirmed,'기기 임시 저장을 사용할 수 없어요. 인터넷 연결을 유지해주세요. '+self.lastMessage,self.dirty);}
+  try{var result=this.o.persist({data:this.data,base:this.base,version:this.version,pending:this.dirty,outbox:this.outbox});if(result&&result.catch)result.catch(failed);}catch(e){failed();return;}
+  this.o.onChange(this.data,this.confirmed,message,this.dirty);
+ };
  Session.prototype.open=async function(){try{var r=await this.o.load();if(this.closed)return;this.fatal=false;
   if(this.dirty){if(!this.base){if(this.version!==r.version)throw Error('이전 미저장 변경의 기준 버전을 확인할 수 없어요. 백업 후 복구해주세요.');this.base=r.data;}
    if(!this.outbox.length&&this.version!==r.version&&!D.same(this.base,r.data))throw Error('이전 버전 미저장 변경을 백업한 뒤 복구해주세요.');this.data=this.outbox.length?D.replay(r.data,this.outbox):D.reconcile(this.base,this.data,r.data);this.base=r.data;this.version=r.version;this.confirmed=r.data;this.emit('미저장 변경을 이어서 저장합니다');this.flush();
