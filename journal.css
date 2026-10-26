@@ -7,4 +7,38 @@ body.journal-mode{background:linear-gradient(155deg,#f5f0e5,#fcf8f0 65%,#f0ecdf)
 
 .capture-prompts{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.capture-prompts button{border:1px solid #e9d9ce;border-radius:18px;padding:10px 14px;background:#fffaf5;color:#735543;font:inherit;font-size:13px;cursor:pointer}.capture-prompts button.on{background:#eed5d5;border-color:#b88484;color:#593b3b}.capture-details{margin:12px 0}.capture-details summary{cursor:pointer;padding:10px 0;color:#735543;font-size:13px}.journal-voices{margin-top:20px;padding-top:16px;border-top:1px dashed #e9d9ce}.journal-voice{margin:10px 0;padding:12px 14px;background:#faf3e9;border-radius:4px 15px 15px}.journal-voice strong{font-size:12px;color:#795e4b}.journal-voice p{margin:6px 0 0;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}.journal-voices textarea{width:100%;margin:8px 0}.journal-voices small{display:block;margin-bottom:8px;color:#8d7869}.quick-capture{background:#fff8ed}.capture-prompts button:focus-visible,.now-plan:focus-visible{outline:2px solid #855f54;outline-offset:3px}
 
-.food-planner{background:linear-gradient(140deg,#fff8ed,#fffdf9)}.food-planner>h2{font-size:26px;margin:10px 0}.food-field{border:0;padding:0;margin:18px 0}.food-field legend,.food-planner>label{font-size:13px;font-weight:600;color:#705744}.food-planner>label{display:block;margin-top:14px}.food-planner input:not([type=checkbox]),.food-planner textarea{display:block;width:100%;box-sizing:border-box;margin-top:7px}.food-chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}.food-chips button{padding:9px 13px;border:1px solid #e7d8c8;border-radius:18px;background:#fffdf9;color:#715642;font:inherit;font-size:13px;cursor:pointer}.food-chips button[aria-pressed=true]{background:#eed7bc;color:#503824;border-color:#bc9270}.food-chips button:focus-visible{outline:2px solid #8a6043;outline-offset:2px}.food-simple{display:flex!important;align-items:center;gap:8px}.food-simple input{width:18px;height:18px;margin:0}.food-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}.food-actions button{flex:1;min-width:140px}.food-results{margin-top:22px}.food-results article{margin:12px 0;padding:16px;background:#fff;border:1px solid #eee1d3;border-radius:16px}.food-results h3{margin:0 0 8px;font-size:18px;color:#5f412d}.food-results article p{font-size:14px;line-height:1.7;margin:0 0 10px;overflow-wrap:anywhere}.food-results small{display:block;color:#92775f;line-height:1.6;margin-bottom:12px}.food-help{font-size:12px;margin:10px 0}.food-error{color:#9b4a3a;font-size:13px;line-height:1.6}
+.food-planner{background:linear-gradient(145deg,#fff8ed,#fffdf9)}
+.food-wizard-top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.food-step-count{font-size:12px;color:#9b826c;white-space:nowrap}
+.food-progress{height:3px;background:#eee3d6;border-radius:8px;margin:16px 0 25px;overflow:hidden}
+.food-progress span{display:block;height:100%;background:#bd9473;transition:width .2s ease}
+.food-question,.food-conclusion{animation:food-arrive .18s ease-out}
+.food-question-title{font-size:25px!important;line-height:1.4;margin:0 0 12px!important;color:#60422e}
+.food-question-title:focus{outline:none}
+.food-question>.muted{font-size:14px;line-height:1.7;margin-bottom:22px}
+.food-answer-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:20px 0}
+.food-answer{position:relative;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:7px;min-height:86px;padding:17px 28px 17px 16px;border:1px solid #e7d8c8;border-radius:16px;background:#fffdf9;color:#715642;font:inherit;text-align:left;cursor:pointer;transition:background .15s,border-color .15s}
+.food-answer strong{font-size:15px;line-height:1.5;overflow-wrap:anywhere}
+.food-answer small{font-size:12px;color:#9a7b63;line-height:1.5}
+.food-answer>span{position:absolute;right:12px;color:#b38d70}
+.food-answer[aria-pressed=true]{background:#f6e6d5;border-color:#bc9270}
+.food-answer:hover{background:#f6e6d5;border-color:#bc9270}
+.food-answer:focus-visible,.food-back:focus-visible{outline:2px solid #8a6043;outline-offset:3px}
+.food-text-answer{margin:20px 0 8px}
+.food-text-answer label{display:block;font-size:13px;color:#705744;margin-bottom:14px}
+.food-text-answer input,.food-text-answer textarea{display:block;width:100%;box-sizing:border-box;margin-top:8px}
+.food-back{border:0;background:none;padding:12px 0;color:#967861;font:inherit;font-size:13px;cursor:pointer}
+.food-summary{font-size:13px;line-height:1.8;color:#94785f;overflow-wrap:anywhere}
+.food-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
+.food-actions button{flex:1;min-width:140px}
+.food-result-nav{display:flex;justify-content:space-between;gap:16px}
+.food-results{margin-top:22px}
+.food-results article{margin:12px 0;padding:16px;background:#fff;border:1px solid #eee1d3;border-radius:16px}
+.food-results h3{margin:0 0 8px;font-size:18px;color:#5f412d}
+.food-results article p{font-size:14px;line-height:1.7;margin:0 0 10px;overflow-wrap:anywhere}
+.food-results small{display:block;color:#92775f;line-height:1.6;margin-bottom:12px}
+.food-help{font-size:12px;margin:10px 0}
+.food-error{color:#9b4a3a;font-size:13px;line-height:1.6}
+@keyframes food-arrive{from{opacity:.3;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.food-question,.food-conclusion{animation:none}.food-progress span{transition:none}}
+@media(max-width:360px){.food-answer-grid{grid-template-columns:1fr}.food-question-title{font-size:22px!important}}
