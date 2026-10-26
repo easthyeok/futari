@@ -74,6 +74,24 @@
     var wall=item('wall'),floor=item('floor');
     return h('div',null,h('section',{className:'house',style:{background:'linear-gradient('+(wall?wall.color:'#fff6df')+' 72%, '+(floor?floor.color:'#e4c3a5')+' 72%)'},'aria-label':'둘이 꾸민 우리 집'},h('div',{className:'house-window'},wall&&wall.id==='night'?'🌙':'☀️'),h('div',{className:'house-shelf'},'📚',item('plant')?item('plant').icon:'',item('lamp')?item('lamp').icon:''),h('div',{className:'house-sofa'},'🛋️'),h('div',{className:'house-people'},h('span',null,moods.me||'🙂'),h('span',null,moods.you||'🙂')),item('rug')?h('div',{className:'house-rug'},item('rug').icon+' 포근한 우리 집 '+item('rug').icon):null,item('pet')?h('div',{className:'house-cat'},item('pet').icon):null),h(Decorator,props));
   }
+  function quizRound(d,date,turn){
+    var seen={},all=(window.FutariCalendar?window.FutariCalendar.journalRecords(d):[]).filter(function(e){return e.date<date&&e.photos.length;}),photoDates={};
+    all.forEach(function(e){var src=e.photos[0];if(!photoDates[src])photoDates[src]=new Set();photoDates[src].add(e.date);});
+    var photos=all.filter(function(e){var src=e.photos[0];if(photoDates[src].size!==1||seen[src])return false;seen[src]=true;return true;});
+    var dates=Array.from(new Set(photos.map(function(e){return e.date;}))).sort();if(dates.length<2)return null;
+    var seed=Math.floor(Date.parse(date+'T00:00:00Z')/86400000)+(turn||0),entry=photos[seed%photos.length],alternatives=dates.filter(function(v){return v!==entry.date;}),choices=[entry.date];
+    for(var i=0;i<Math.min(2,alternatives.length);i++)choices.push(alternatives[(seed+i)%alternatives.length]);
+    choices.sort();var offset=seed%choices.length;choices=choices.slice(offset).concat(choices.slice(0,offset));
+    return {key:entry.key+'-'+entry.date+'-'+(turn||0),entry:entry,choices:choices};
+  }
+  function MemoryQuiz(props){
+    var ss=window.React.useState(0),turn=ss[0],setTurn=ss[1],as=window.React.useState(null),answer=as[0],setAnswer=as[1],round=quizRound(props.data,day(),turn);
+    if(!round)return null;var revealed=answer&&answer.key===round.key;
+    return h('section',{className:'card memory-quiz','aria-label':'둘만의 추억 퀴즈'},h('span',{className:'eyebrow'},'REMEMBER THIS LITTLE MOMENT?'),h('h2',{className:'title-lg'},'이 사진, 언제였더라?'),h('p',{className:'muted'},'맞혀도 틀려도, 그날 이야기가 다시 시작돼요.'),
+      h('img',{className:'now-memory-photo',src:round.entry.photos[0],alt:'우리의 지난 사진 · 날짜를 떠올려봐요'}),
+      h('div',{className:'quiz-choices'},round.choices.map(function(value){return h('button',{key:value,className:'btn ghost'+(revealed&&value===round.entry.date?' quiz-correct':''),disabled:!!revealed,'aria-pressed':!!(revealed&&answer.date===value),onClick:function(){setAnswer({key:round.key,date:value});}},value.replace(/-/g,'.'));})),
+      revealed?h('div',{className:'quiz-reveal',role:'status'},h('strong',null,answer.date===round.entry.date?'맞아, 바로 이날!':'기억을 펼쳐보니 이날이었어요.'),h('p',null,round.entry.date+' · '+round.entry.title),h('div',{className:'now-actions'},h('button',{className:'btn sm',onClick:function(){props.navigate('together',round.entry.id);}},'그날 이야기 펼치기'),h('button',{className:'btn ghost sm',onClick:function(){setAnswer(null);setTurn(turn+1);}},'다른 추억'))):h('button',{className:'btn ghost sm',onClick:function(){setAnswer({key:round.key,date:null});}},'기억이 안 나요 · 같이 보기'));
+  }
   function HomePage(props){
     var d=props.data,date=day(),state=window.React.useState(0),pick=state[0],setPick=state[1];
     var wishes=(d.buckets||[]).filter(function(b){return !b.done;}),wish=wishes.length?wishes[(Math.floor(Date.parse(date+'T00:00:00Z')/86400000)+pick)%wishes.length]:null;
@@ -83,6 +101,8 @@
     function go(tab,id){props.navigate(tab,id);}
     return h('div',{className:'our-now'},
       h('header',{className:'today-heading'},h('p',{className:'eyebrow'},'FUTARI · OUR LITTLE MOMENTS'),h('h1',{className:'title-xl'},'우리의 지금'),h('p',{className:'muted'},'오늘은 또 어떤 이야기를 만들까요?')),
+      h('section',{className:'card quick-capture'},h('span',{className:'eyebrow'},'JUST A LITTLE MOMENT'),h('h2',{className:'title-lg'},'길게 안 써도 좋아요'),h('p',{className:'muted'},'사진 한 장, 웃겼던 말 하나. 남기고 싶을 때만 툭.'),h('div',{className:'capture-prompts'},['사진 한 장','오늘의 명장면','오늘 가장 웃겼던 말'].map(function(label){return h('button',{key:label,onClick:function(){go('together','capture:'+label);}},label);}))),
+      h(MemoryQuiz,props),
       h('section',{className:'card now-hero'},h('span',{className:'eyebrow'},'ONE LITTLE IDEA FOR US'),h('h2',{className:'title-lg'},wish?wish.text:'우리의 다음 즐거움을 골라볼까요?'),h('p',{className:'muted'},wish?'함께 하고 싶다고 적어둔 일이에요. 이번엔 날짜를 정해볼까요?':'거창한 계획 말고, 함께 해보고 싶은 작은 일 하나부터.'),
         h('div',{className:'now-actions'},h('button',{className:'btn',onClick:function(){go('together',wish?wish.id:'wishes');}},wish?'함께할 날짜 정하기':'하고 싶은 일 적기'),wishes.length>1?h('button',{className:'btn ghost',onClick:function(){setPick(pick+1);}},'다른 아이디어'):null)),
       h('section',{className:'card'},h('span',{className:'eyebrow'},'A LITTLE CLOSER TODAY'),h('h2',{className:'title-lg'},'오늘의 너는 어때?'),h('div',{className:'now-moods'},['me','you'].map(function(w){return h('span',{key:w},(names[w]||w)+' '+((e.moods||{})[w]||'아직 소식이 없어요'));})),h('p',{className:'muted'},'매일 달라지는 선택과 질문으로 서로의 오늘을 알아봐요.'),h('button',{className:'btn ghost block',onClick:function(){go('today');}},'오늘의 대화 시작하기')),
@@ -90,7 +110,7 @@
       plans.length?h('section',{className:'card'},h('h2',{className:'title-lg'},'다가오는 우리의 날들'),plans.map(function(plan){return h('button',{key:plan.key,className:'now-plan',onClick:function(){go('together',plan.id);}},h('span',null,plan.date),h('strong',null,plan.title),h('span',{'aria-hidden':true},'↗'));})):null,
       h('section',{className:'card'},h('h2',{className:'title-lg'},'말보다 한 판?'),h('p',{className:'muted'},'같이 있는 지금, 짧은 승부로 웃어봐요.'),h('button',{className:'btn ghost block',onClick:function(){go('games');}},'둘이 게임하기')));
   }
-  window.FutariHome = { Interior:function(props){return window.FutariInterior?h(window.FutariInterior.Interior,props):h(Interior,props);}, HomePage:HomePage, Decorator: Decorator, items: ITEMS, earned: earned, balance: balance, decorate: decorate, act: act, growth: growth, question: question, day:day };
+  window.FutariHome = { Interior:function(props){return window.FutariInterior?h(window.FutariInterior.Interior,props):h(Interior,props);}, HomePage:HomePage,MemoryQuiz:MemoryQuiz,quizRound:quizRound, Decorator: Decorator, items: ITEMS, earned: earned, balance: balance, decorate: decorate, act: act, growth: growth, question: question, day:day };
   function farmIncome(d){return window.FutariFarm?window.FutariFarm.income(d):0;}
   function farmSpent(d){return window.FutariFarm?window.FutariFarm.spent(d):0;}
 })();
