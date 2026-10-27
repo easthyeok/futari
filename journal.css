@@ -42,3 +42,18 @@ body.journal-mode{background:linear-gradient(155deg,#f5f0e5,#fcf8f0 65%,#f0ecdf)
 @keyframes food-arrive{from{opacity:.3;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce){.food-question,.food-conclusion{animation:none}.food-progress span{transition:none}}
 @media(max-width:360px){.food-answer-grid{grid-template-columns:1fr}.food-question-title{font-size:22px!important}}
+.food-condition{border:0;padding:0;margin:20px 0;min-width:0}
+.food-condition legend,.food-condition-input,.food-chat-form label{font-size:13px;color:#705744;font-weight:600}
+.food-chips{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.food-chips button[aria-pressed=true]{background:#f6e6d5;border-color:#bc9270;color:#60422e}
+.food-condition-input{display:block;margin:16px 0}
+.food-condition-input input{display:block;width:100%;box-sizing:border-box;margin-top:8px}
+.food-messages{max-height:540px;overflow-y:auto;overscroll-behavior:contain;padding:4px 2px}
+.food-message-user{display:flex;justify-content:flex-end;margin:14px 0}
+.food-message-user p{max-width:85%;background:#f0dfcc;border-radius:16px 16px 4px 16px;padding:12px 16px;margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px}
+.food-message-assistant .food-results{margin-top:12px}
+.food-chat-form{margin-top:20px}
+.food-chat-form>div{display:flex;gap:8px;margin-top:8px}
+.food-chat-form input{flex:1;min-width:0;width:100%}
+.food-chat-form button{flex-shrink:0}
+.food-conversation button:disabled{cursor:default;opacity:.6}
