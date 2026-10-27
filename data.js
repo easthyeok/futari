@@ -3,7 +3,7 @@
  function copy(v){return JSON.parse(JSON.stringify(v),function(k,v){if(['__proto__','prototype','constructor'].indexOf(k)>=0)throw Error('지원하지 않는 데이터 키입니다.');return v;});}
  function migrate(raw){var d=copy(raw||{});if((d.schemaVersion||0)>VERSION)throw Error('더 새로운 데이터입니다. 앱을 업데이트해주세요.');
   d.settings=Object.assign({me:'나',you:'너',startDate:'',anniversaries:[]},d.settings||{});
-  ['memories','places','buckets','dates','moods','polls','gameResults','activities','mail'].forEach(function(k){if(d[k]===undefined)d[k]=[];if(!Array.isArray(d[k]))throw Error(k+' 데이터 형식 오류');});
+  ['foodWishes','memories','places','buckets','dates','moods','polls','gameResults','activities','mail'].forEach(function(k){if(d[k]===undefined)d[k]=[];if(!Array.isArray(d[k]))throw Error(k+' 데이터 형식 오류');});
   ['answers','together','boardGames','dodge','animalCare','collection','commits'].forEach(function(k){if(d[k]===undefined)d[k]={};});
   d.collection=Object.assign({crops:{},teamHarvests:0},d.collection||{});
   d.house=Object.assign({owned:[],equipped:{},placements:{},avatars:{me:{color:'#d58b79',style:'round'},you:{color:'#8baabd',style:'round'}}},d.house||{});

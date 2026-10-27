@@ -57,3 +57,5 @@ body.journal-mode{background:linear-gradient(155deg,#f5f0e5,#fcf8f0 65%,#f0ecdf)
 .food-chat-form input{flex:1;min-width:0;width:100%}
 .food-chat-form button{flex-shrink:0}
 .food-conversation button:disabled{cursor:default;opacity:.6}
+
+.food-saved{margin-top:28px;padding-top:22px;border-top:1px solid #e7d8c8}.food-saved h2{font-size:20px;color:#60422e}.food-saved summary{padding:12px 0;cursor:pointer;color:#705744}.food-saved>p{font-size:14px;line-height:1.7}

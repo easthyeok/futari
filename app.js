@@ -15,7 +15,7 @@
   function freshData() {
     var starter = {
       settings: { me: '나', you: '너', startDate: '', anniversaries: [] },
-      memories: [], places: [], buckets: [], dates: [], moods: [], polls: [], answers: {}, together: {}, house: { owned: [], equipped: {} }, boardGames: {}, gameResults: [], dodge: {}, farm: { level: 0, buildings: {}, crops: {}, seedSpent: 0, harvestCoins: 0, harvests: 0 },
+      foodWishes: [], memories: [], places: [], buckets: [], dates: [], moods: [], polls: [], answers: {}, together: {}, house: { owned: [], equipped: {} }, boardGames: {}, gameResults: [], dodge: {}, farm: { level: 0, buildings: {}, crops: {}, seedSpent: 0, harvestCoins: 0, harvests: 0 },
     };
     return window.FutariData?window.FutariData.migrate(starter):starter;
   }
