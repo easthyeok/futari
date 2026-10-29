@@ -20,26 +20,21 @@ assert.equal(F.draw([],{},6).length,0);assert.equal(F.draw(F.menus.slice(0,2),{}
 const recent=F.menus.slice(0,15).map((x,i)=>({id:'r'+i,name:x.name,done:true,eatenAt:new Date(2026,0,i+1).toISOString()}));
 const available=F.foodPool({foodWishes:recent},{skipRecent:true});assert.equal(available.length,364-12);assert(available.some(x=>x.name===recent[0].name));assert(!available.some(x=>x.name===recent[14].name));assert.equal(F.foodPool({foodWishes:recent},{skipRecent:false}).length,364);
 const fixed={foodWishes:F.menus.slice(0,3).map((x,i)=>({id:'w'+i,name:x.name,done:false}))};assert.equal(F.foodPool(fixed,{}).length,364,'saved wishes do not shrink the full menu pool');
-let data={foodWishes:[],buckets:[]},props={data,room:'room',update:fn=>fn(data)};
+let data={foodWishes:[{id:'legacy',name:'예전에 저장한 음식',description:'예전에 저장한 긴 설명',done:false}],buckets:[]},props={data,room:'room',update:fn=>fn(data)};
 function render(){cursor=0;const tree=F.Planner(props);effects.splice(0).forEach(fn=>fn());return tree;}
-function screen(){render();return render();}
 function all(n,p){if(!n||typeof n!=='object')return[];return(p(n)?[n]:[]).concat(...n.children.map(x=>all(x,p)));}
 function text(n){return n&&typeof n==='object'?n.children.map(text).join(''):String(n??'');}
 function button(tree,label){const b=all(tree,x=>x.type==='button'&&text(x)===label)[0];assert(b,'button '+label);return b;}
-function recommendations(tree){return tree.children.find(x=>x&&x.props&&x.props['aria-live']==='polite');}
-let tree=screen();assert(text(tree).includes('364가지 메뉴'));assert(!text(tree).includes('AI'));assert(!text(tree).includes('한도'));assert.equal(all(recommendations(tree),x=>x.type==='article').length,6);
-const first=all(recommendations(tree),x=>x.type==='h3').map(text);button(tree,'다른 메뉴 보기').props.onClick();tree=screen();assert(all(recommendations(tree),x=>x.type==='h3').every(x=>!first.includes(text(x))));
-const chosen=all(recommendations(tree),x=>x.type==='h3').map(text)[0];const save=button(recommendations(tree),'다음에 먹자');save.props.onClick();save.props.onClick();assert.equal(data.foodWishes.length,1);assert.equal(data.foodWishes[0].name,chosen);assert(data.foodWishes[0].description);assert(!data.foodWishes[0].preparation);
-tree=screen();assert(button(recommendations(tree),'저장했어요').props.disabled);button(tree,'먹었어').props.onClick();assert(data.foodWishes[0].done);assert(data.foodWishes[0].eatenAt);assert(!F.foodPool(data,{skipRecent:true}).some(x=>x.name===chosen));
-// Filters and search change the actual candidates, not just the displayed count.
-tree=screen();all(tree,x=>x.type==='input'&&x.props.type==='checkbox')[0].props.onChange({target:{checked:false}});tree=screen();all(tree,x=>x.type==='select')[0].props.onChange({target:{value:'분식'}});tree=screen();assert(all(recommendations(tree),x=>x.type==='h3').every(x=>F.menus.find(m=>m.name===text(x)).category==='분식'));
-all(tree,x=>x.type==='input'&&x.props.type==='search')[0].props.onChange({target:{value:'로제'}});tree=screen();assert.equal(all(recommendations(tree),x=>x.type==='h3').length,2);assert(text(recommendations(tree)).includes('넓적당면'));
-all(tree,x=>x.type==='input'&&x.props.type==='search')[0].props.onChange({target:{value:'no-such-food'}});tree=screen();assert(text(tree).includes('조건에 맞는 메뉴가 없어요'));assert(button(tree,'다른 메뉴 보기').props.disabled);
-// Custom names and combinations persist with saved wishes and enter future draws.
-let fields=all(tree,x=>x.type==='input'&&!x.props.type);fields[0].props.onChange({target:{value:'우리 로제떡볶이'}});tree=screen();fields=all(tree,x=>x.type==='input'&&!x.props.type);fields[1].props.onChange({target:{value:'당면 두 배에 치즈 듬뿍!'}});tree=screen();all(tree,x=>x.type==='form')[0].props.onSubmit({preventDefault(){}});assert(data.foodWishes.some(x=>x.name==='우리 로제떡볶이'&&x.description==='당면 두 배에 치즈 듬뿍!'));assert.equal(F.catalog(data).length,365);
-// Food picker exposes no date recommendations and does not modify existing date wishes.
-data.buckets.push({id:'date',text:'도자기 만들기',category:'경험',done:false});tree=screen();assert(!text(tree).includes('데이트 코스'));assert(!text(tree).includes('다른 코스'));assert(!F.datePool);assert.equal(data.buckets.length,1);
-// Switching rooms never leaves the previous room's food candidates visible.
-props={...props,room:'other',data:{foodWishes:[{id:'custom',name:'다른 방 메뉴',description:'다른 방에서만 볼 메뉴',done:false}],buckets:[]},update(){}};tree=screen();assert(!text(tree).includes('우리 로제떡볶이'));
-assert.equal(network,0,'recommendations never call external services, even with stale AI config');
-console.log('PASS: 364 unique described menus, 14 categories, exhaustive shuffle, search, recent exclusions, custom combinations, duplicate-safe saves, date recommendation removal, room isolation and zero AI calls');
+let tree=render();const original=JSON.stringify(data);
+assert.equal(text(tree),'오늘 뭐 먹지?');assert.equal(all(tree,x=>x.type==='button').length,1);assert.equal(all(tree,x=>x.type==='section').length,0);assert.equal(button(tree,'오늘 뭐 먹지?').props['aria-expanded'],false);assert.equal(JSON.stringify(data),original,'loading the home page must not modify saved records');
+button(tree,'오늘 뭐 먹지?').props.onClick();tree=render();assert.equal(all(tree,x=>x.type==='h2').length,1);assert.equal(all(tree,x=>x.type==='p').length,1);assert.equal(all(tree,x=>x.type==='button').length,3);assert.equal(button(tree,'오늘 뭐 먹지?').props['aria-expanded'],true);
+assert.equal(all(tree,x=>['input','select','form','details'].includes(x.type)).length,0);assert(!text(tree).includes('전체 메뉴'));assert(!text(tree).includes('먹고 싶은 메뉴'));assert(!text(tree).includes('예전에 저장한 긴 설명'));assert(!text(tree).includes('데이트'));
+const first=text(all(tree,x=>x.type==='h2')[0]);button(tree,'다른 메뉴').props.onClick();tree=render();const chosen=text(all(tree,x=>x.type==='h2')[0]);assert.notEqual(chosen,first);assert.equal(all(tree,x=>x.type==='h2').length,1);
+const save=button(tree,'다음에 먹자');save.props.onClick();save.props.onClick();tree=render();assert.equal(data.foodWishes.length,2);assert.equal(data.foodWishes[1].name,chosen);assert(data.foodWishes[1].description);assert(!data.foodWishes[1].preparation);assert(button(tree,'저장했어요').props.disabled);assert.equal(text(all(tree,x=>x.type==='h2')[0]),chosen,'saving does not replace the selected menu');assert.equal(data.foodWishes[0].name,'예전에 저장한 음식');
+button(tree,'오늘 뭐 먹지?').props.onClick();tree=render();assert.equal(text(tree),'오늘 뭐 먹지?');button(tree,'오늘 뭐 먹지?').props.onClick();tree=render();assert.notEqual(text(all(tree,x=>x.type==='h2')[0]),chosen,'reopening continues the shuffled deck');
+let focus=0;button(tree,'오늘 뭐 먹지?').props.ref.current={focus(){focus++;}};tree.props.onKeyDown({key:'Escape'});tree=render();assert.equal(text(tree),'오늘 뭐 먹지?');assert.equal(focus,1);
+assert.equal(F.shortDescription({description:'가'.repeat(200)}).length,72);assert.equal(Array.from(F.shortDescription({description:'🍜'.repeat(100)})).length,72);assert(F.shortDescription({description:'짧은 설명'})==='짧은 설명');
+// Another room cannot inherit an open suggestion or the previous room's deck.
+button(tree,'오늘 뭐 먹지?').props.onClick();tree=render();props={...props,room:'other',data:{foodWishes:[],buckets:[]},update(){}};tree=render();assert.equal(text(tree),'오늘 뭐 먹지?');button(tree,'오늘 뭐 먹지?').props.onClick();tree=render();assert.equal(all(tree,x=>x.type==='h2').length,1);
+assert.equal(network,0,'opening, cycling and saving never call AI');
+console.log('PASS: 364 described candidates, complete shuffle, recent exclusions, button-only home, one concise suggestion, duplicate-safe save, close/Escape, room isolation and no network');
