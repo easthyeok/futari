@@ -1,3 +1,4 @@
+import { quotaDenial } from './quota.mjs';
 import { createHandler } from './handler.mjs';
 function list(name: string): string[] {
   try { const value = JSON.parse(Deno.env.get(name) || '[]'); return Array.isArray(value) && value.every(v => typeof v === 'string') ? value : []; }
@@ -17,6 +18,13 @@ Deno.serve(createHandler({
       body: JSON.stringify({room_hash: roomHash})
     });
     if (!response.ok) throw Error('quota_unavailable');
-    return (await response.json()) === true;
+    if ((await response.json()) === true) return true;
+    // The existing atomic quota RPC returns false for both cooldown and daily caps.
+    // Read only the two usage rows with the server key to explain the rejection.
+    const usage = await fetch(base + '/rest/v1/food_recommendation_usage?select=scope,usage_day,requests,last_request&scope=in.(global,room:' + roomHash + ')', {
+      signal, headers:{apikey:serviceKey,Authorization:'Bearer ' + serviceKey}
+    });
+    if (!usage.ok) return {allowed:false,error:'request_limit'};
+    return quotaDenial(await usage.json(),roomHash);
   } : undefined
 }));

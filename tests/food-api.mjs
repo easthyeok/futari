@@ -1,17 +1,19 @@
 import assert from 'node:assert/strict';
 import { createHandler, validateInput, validOutput } from '../supabase/functions/food-recommend-gemini/handler.mjs';
 const form={mode:'pair',category:'상관없음',main:'과메기',drink:'막걸리',method:'직접 요리',taste:'국물',simple:true,exclude:'오이',note:'따뜻한 국물도 하나'};
-const items=[{name:'바지락 술찜',reason:'따뜻하게 곁들여요',preparation:'약 20분'}, {name:'어묵탕',reason:'맑은 국물',preparation:'약 15분'}, {name:'콩나물국',reason:'가벼운 국물',preparation:'약 15분'}];
+const items=[{name:'바지락 술찜'},{name:'어묵탕'},{name:'콩나물국'}];
+const dateItems=[{name:'전시와 산책',reason:'전시 기록을 참고했어요.',steps:['전시 관람','공원 산책']},{name:'공방 체험',reason:'함께 할 일에서 골랐어요.',steps:['도자기 공방','카페']},{name:'영화 데이트',reason:'실내 활동을 골랐어요.',steps:['영화 관람','산책']}];
+let outputItems=items;
 let calls=[],quotas=[],permitted=true,quotaThrows=false,kind='ok';
 const config={apiKey:'server-only-test-key',model:'gemini-3.5-flash-lite',allowedRooms:['room'],allowedOrigins:['https://example.com'],consumeQuota:async hash=>{quotas.push(hash);if(quotaThrows)throw Error('secret diagnostics');return permitted;},fetcher:async(url,options)=>{
   calls.push({url,options});if(kind==='throw')throw Error('secret diagnostics');if(kind==='abort'){const e=Error('timeout');e.name='AbortError';throw e;}
   if(kind==='rate')return new Response('private upstream diagnostics',{status:429});if(kind==='error')return new Response('private upstream diagnostics',{status:401});
   if(kind==='malformed')return new Response(JSON.stringify({candidates:[{finishReason:'STOP',content:{parts:[{text:'not JSON'}]}}]}));
   if(kind==='refusal')return new Response(JSON.stringify({promptFeedback:{blockReason:'SAFETY'}}));
-  return new Response(JSON.stringify({candidates:[{finishReason:kind==='incomplete'?'MAX_TOKENS':'STOP',content:{parts:[{thought:true,text:'private reasoning'},{text:JSON.stringify({items:kind==='short'?items.slice(0,1):items})}]}}]}));
+  return new Response(JSON.stringify({candidates:[{finishReason:kind==='incomplete'?'MAX_TOKENS':'STOP',content:{parts:[{thought:true,text:'private reasoning'},{text:JSON.stringify({items:kind==='short'?outputItems.slice(0,1):outputItems})}]}}]}));
 }};
 const handler=createHandler(config);
-function request(body={room:'room',form,avoid:['골뱅이소면']},options={}){return new Request('https://edge.example/food-recommend',{method:options.method||'POST',headers:{Origin:options.origin===undefined?'https://example.com':options.origin,'Content-Type':options.type||'application/json'},body:options.method==='GET'||options.method==='OPTIONS'?undefined:typeof body==='string'?body:JSON.stringify(body)});}
+function request(body={room:'room',form,avoid:['골뱅이소면']},options={}){return new Request('https://edge.example/food-recommend',{method:options.method||'POST',headers:{Origin:options.origin===undefined?'https://example.com':options.origin,'Content-Type':options.type||'application/json'},body:options.method==='GET'||options.method==='OPTIONS'?undefined:typeof body==='string'?body:JSON.stringify({...body,recommendationVersion:2})});}
 assert(validateInput({room:'room',form}));assert.equal(validateInput({room:'room',form:{...form,note:'x'.repeat(401)}}),null);assert.equal(validateInput({room:'room',form:{...form,drink:'arbitrary'}}),null);assert.equal(validateInput({room:'room',form,avoid:['x'.repeat(81)]}),null);assert.equal(validateInput({room:'room',form:{...form,simple:'yes'}}),null);assert(validateInput({room:'room',form:{...form,main:'부야베스와 뇨키',category:'세계요리'}}));assert.equal(validateInput({room:'room',form:{...form,category:'invalid'}}),null);assert.equal(validateInput({room:'room',form,avoid:Array(13).fill('menu')}),null);assert(validOutput({items}));assert(!validOutput({items:[items[0],items[0],items[0]]}));
 assert.equal((await handler(request({}, {method:'OPTIONS'}))).status,204);
 assert.equal((await handler(request({}, {method:'GET'}))).status,405);
@@ -36,6 +38,31 @@ const validated=validateInput({room:'room',form,kind:'date',history:context});
 assert.equal(validated.kind,'date');assert.equal(validated.history.memories[0].title,'바다 여행');assert(!JSON.stringify(validated.history).includes('private'));
 assert.equal(validateInput({room:'room',form,kind:'bad'}),null);assert.equal(validateInput({room:'room',form,history:{dates:Array(9).fill({})}}),null);
 assert.equal(validateInput({room:'room',form,history:{memories:[{title:'x'.repeat(81)}]}}),null);
-kind='ok';response=await handler(request({room:'room',form,kind:'date',history:context}));assert.equal(response.status,200);
+kind='ok';outputItems=dateItems;response=await handler(request({room:'room',form,kind:'date',history:context}));assert.equal(response.status,200);
 const proactive=JSON.parse(JSON.parse(calls.at(-1).options.body).contents[0].parts[0].text);assert.equal(proactive.kind,'date');assert(!JSON.stringify(proactive).includes('private'));
 console.log('PASS: date mode and bounded record context strip diary bodies and photos');
+
+assert(!('preferences' in proactive),'date prompt is not supplied meal mode or cooking preferences');
+assert.deepEqual((await response.json()).items,dateItems);
+assert.equal(validOutput({items},'date'),false);
+outputItems=items;response=await handler(request({room:'room',form,kind:'date'}));assert.equal(response.status,502,'menu-only response rejected for date request');
+outputItems=dateItems.map(x=>({...x,steps:['single stop']}));assert(!validOutput({items:outputItems},'date'));
+for(const [error,retryAfter] of [['request_cooldown',4],['daily_limit',undefined],['request_limit',undefined]]) {
+ const throttled=createHandler({...config,consumeQuota:async()=>({allowed:false,error,retryAfter})});
+ response=await throttled(request());assert.equal(response.status,429);const body=await response.json();assert.equal(body.error,error);if(retryAfter)assert.equal(body.retryAfter,retryAfter);
+}
+outputItems=items;kind='rate';response=await handler(request());assert.equal((await response.json()).error,'provider_rate_limit');
+kind='ok';outputItems=items.map(x=>({...x,preparation:'recipe must be stripped',reason:'no extra text'}));response=await handler(request());assert.deepEqual((await response.json()).items,items);
+const datePayload=JSON.parse(calls.findLast(call=>JSON.parse(call.options.body).generationConfig.responseFormat.text.schema.properties.items.items.properties.steps).options.body);
+assert(!datePayload.systemInstruction.parts[0].text.includes('mode=meal'));
+assert.deepEqual(datePayload.generationConfig.responseFormat.text.schema.properties.items.items.required,['name','reason','steps']);
+console.log('PASS: separate prompts/schemas, date rejects menu-only response, meal strips recipes, provider/cooldown/daily errors');
+
+const {quotaDenial}=await import('../supabase/functions/food-recommend-gemini/quota.mjs');
+const now=Date.parse('2026-10-29T08:00:00Z'),row={scope:'room:hash',usage_day:'2026-10-29',requests:9,last_request:'2026-10-29T07:59:57Z'};
+assert.deepEqual(quotaDenial([row],'hash',now),{allowed:false,error:'request_cooldown',retryAfter:7});
+assert.equal(quotaDenial([{...row,requests:20}],'hash',now).error,'daily_limit');
+assert.equal(quotaDenial([{...row,scope:'global',requests:100}],'hash',now).error,'daily_limit');
+assert.equal(quotaDenial([{...row,usage_day:'2026-10-28',requests:20,last_request:'2026-10-28T08:00:00Z'}],'hash',now).error,'request_limit');
+assert.equal(quotaDenial({},'hash',now).error,'request_limit');
+console.log('PASS: quota rejection distinguishes 10-second cooldown and UTC daily room/global caps');
