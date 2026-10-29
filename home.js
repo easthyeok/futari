@@ -75,16 +75,13 @@
     return h('div',null,h('section',{className:'house',style:{background:'linear-gradient('+(wall?wall.color:'#fff6df')+' 72%, '+(floor?floor.color:'#e4c3a5')+' 72%)'},'aria-label':'둘이 꾸민 우리 집'},h('div',{className:'house-window'},wall&&wall.id==='night'?'🌙':'☀️'),h('div',{className:'house-shelf'},'📚',item('plant')?item('plant').icon:'',item('lamp')?item('lamp').icon:''),h('div',{className:'house-sofa'},'🛋️'),h('div',{className:'house-people'},h('span',null,moods.me||'🙂'),h('span',null,moods.you||'🙂')),item('rug')?h('div',{className:'house-rug'},item('rug').icon+' 포근한 우리 집 '+item('rug').icon):null,item('pet')?h('div',{className:'house-cat'},item('pet').icon):null),h(Decorator,props));
   }
   function HomePage(props){
-    var d=props.data,date=day(),state=window.React.useState(0),pick=state[0],setPick=state[1];
-    var wishes=(d.buckets||[]).filter(function(b){return !b.done;}),wish=wishes.length?wishes[(Math.floor(Date.parse(date+'T00:00:00Z')/86400000)+pick)%wishes.length]:null;
+    var d=props.data,date=day();
     var records=window.FutariCalendar?window.FutariCalendar.journalRecords(d):[],past=records.filter(function(e){return e.date<date;}),memory=past.length?past[Math.floor(Date.parse(date+'T00:00:00Z')/86400000)%past.length]:null;
     var plans=records.filter(function(e){return e.date>=date;}).sort(function(a,b){return a.date.localeCompare(b.date);}).slice(0,3);
     function go(tab,id){props.navigate(tab,id);}
     return h('div',{className:'our-now'},
       h('header',{className:'today-heading'},h('p',{className:'eyebrow'},'FUTARI · OUR LITTLE MOMENTS'),h('h1',{className:'title-xl'},'우리의 지금'),h('p',{className:'muted'},'오늘은 또 어떤 이야기를 만들까요?')),
       window.FutariFood?h(window.FutariFood.Planner,props):null,
-      h('section',{className:'card now-hero'},h('span',{className:'eyebrow'},'ONE LITTLE IDEA FOR US'),h('h2',{className:'title-lg'},wish?wish.text:'우리의 다음 즐거움을 골라볼까요?'),h('p',{className:'muted'},wish?'함께 하고 싶다고 적어둔 일이에요. 이번엔 날짜를 정해볼까요?':'거창한 계획 말고, 함께 해보고 싶은 작은 일 하나부터.'),
-        h('div',{className:'now-actions'},h('button',{className:'btn',onClick:function(){go('together',wish?wish.id:'wishes');}},wish?'함께할 날짜 정하기':'하고 싶은 일 적기'),wishes.length>1?h('button',{className:'btn ghost',onClick:function(){setPick(pick+1);}},'다른 아이디어'):null)),
       h('button',{className:'btn ghost block',style:{marginBottom:16},onClick:function(){go('today');}},'오늘의 대화 시작하기'),
       h('section',{className:'card'},h('span',{className:'eyebrow'},'FROM OUR ARCHIVE'),h('h2',{className:'title-lg'},memory?'이날, 기억나?':'우리의 첫 페이지'),memory?h('div',null,memory.photos[0]?h('img',{className:'now-memory-photo',src:memory.photos[0],alt:memory.title}):null,h('small',{className:'muted'},memory.date),h('h3',null,memory.title),h('p',{className:'now-excerpt'},(memory.memo||'그날의 이야기를 다시 펼쳐봐요.').slice(0,160))):h('p',{className:'muted'},'함께 웃었던 순간을 남겨두면, 여기서 다시 꺼내볼 수 있어요.'),h('button',{className:'btn ghost block',onClick:function(){go('together',memory?memory.id:undefined);}},memory?'그날의 기록 보기':'기록 남기기')),
       plans.length?h('section',{className:'card'},h('h2',{className:'title-lg'},'다가오는 우리의 날들'),plans.map(function(plan){return h('button',{key:plan.key,className:'now-plan',onClick:function(){go('together',plan.id);}},h('span',null,plan.date),h('strong',null,plan.title),h('span',{'aria-hidden':true},'↗'));})):null,

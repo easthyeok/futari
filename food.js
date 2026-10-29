@@ -402,28 +402,29 @@
     return chars.length>72?chars.slice(0,71).join('')+'…':text;
   }
   function Planner(props){
-    var state=R.useState({room:props.room,open:false,item:null}),view=state[0],setView=state[1];
+    var state=R.useState({room:props.room,open:false,items:[]}),view=state[0],setView=state[1];
     var deck=R.useRef({room:props.room,state:{}}),trigger=R.useRef(null);
-    var open=view.room===props.room&&view.open,item=open?view.item:null;
+    var open=view.room===props.room&&view.open,items=open?view.items:[];
     function pick(){
       if(deck.current.room!==props.room)deck.current={room:props.room,state:{}};
       var pool=foodPool(props.data,{skipRecent:true});
-      setView({room:props.room,open:true,item:draw(pool,deck.current.state,1)[0]||null});
+      setView({room:props.room,open:true,items:draw(pool,deck.current.state,4)});
     }
-    function close(){setView({room:props.room,open:false,item:null});}
-    function isSaved(){return item&&(props.data.foodWishes||[]).some(function(x){return !x.done&&normalize(x.name)===normalize(item.name);});}
-    function save(){if(!item)return;props.update(function(d){
+    function close(){setView({room:props.room,open:false,items:[]});}
+    function isSaved(item){return item&&(props.data.foodWishes||[]).some(function(x){return !x.done&&normalize(x.name)===normalize(item.name);});}
+    function save(item){if(!item)return;props.update(function(d){
       d.foodWishes=d.foodWishes||[];
       if(d.foodWishes.some(function(x){return !x.done&&normalize(x.name)===normalize(item.name);}))return;
       d.foodWishes.push({id:window.FutariActivity.id(),done:false,name:item.name,description:item.description});
     });}
     return h('div',{className:'food-quick',onKeyDown:function(e){if(e.key==='Escape'&&open){close();if(trigger.current)trigger.current.focus();}}},
       h('button',{type:'button',className:'btn ghost block',ref:trigger,'aria-expanded':open,'aria-controls':'food-quick-result',onClick:function(){if(open)close();else pick();}},'오늘 뭐 먹지?'),
-      open&&item?h('section',{id:'food-quick-result',className:'card food-quick-result','aria-label':'오늘의 음식 추천'},
-        h('div',{'aria-live':'polite'},h('h2',null,item.name),h('p',null,shortDescription(item))),
-        h('div',{className:'food-quick-actions'},
-          h('button',{type:'button',className:'btn ghost',onClick:pick},'다른 메뉴'),
-          h('button',{type:'button',className:'btn',disabled:isSaved(),onClick:save},isSaved()?'저장했어요':'다음에 먹자'))):null);
+      open&&items.length?h('section',{id:'food-quick-result',className:'card food-quick-result','aria-label':'오늘의 음식 추천'},
+        h('div',{className:'food-quick-grid','aria-live':'polite'},items.map(function(item){return h('article',{key:item.name,className:'food-quick-item'},
+          h('h2',null,item.name),h('p',null,shortDescription(item)),
+          h('button',{type:'button',className:'btn',disabled:isSaved(item),onClick:function(){save(item);}},isSaved(item)?'저장했어요':'다음에 먹자'));})),
+        h('button',{type:'button',className:'btn ghost block food-quick-more',onClick:pick},'다른 메뉴')):null);
+
   }
   window.FutariFood={Planner:Planner,menus:MENUS,categories:CATEGORIES,catalog:catalog,foodPool:foodPool,draw:draw,shortDescription:shortDescription};
 })();
