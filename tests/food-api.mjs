@@ -29,3 +29,13 @@ assert.equal((await createHandler({...config,model:'paid-only-model'})(request()
 assert(calls.every(call=>!call.url.includes('openai.com')));
 for(const value of ['error','throw','malformed','refusal','incomplete','short']){kind=value;response=await handler(request());assert.equal(response.status,502,value);const text=await response.text();assert(!text.includes('diagnostics'));assert(!text.includes('server-only-test-key'));}kind='rate';assert.equal((await handler(request())).status,429);
 console.log('PASS: bounded input/schema validation, strict origins/room allowlist, fail-closed persistent quota, server-only key, Gemini structured output and no paid-provider fallback, data minimization, upstream refusal/incomplete/error handling and CORS');
+
+// New proactive context is bounded and strips private fields before sending upstream.
+const context={memories:[{title:'바다 여행',memo:'private',photos:['private']}],foodWishes:[{name:'우동',done:true}]};
+const validated=validateInput({room:'room',form,kind:'date',history:context});
+assert.equal(validated.kind,'date');assert.equal(validated.history.memories[0].title,'바다 여행');assert(!JSON.stringify(validated.history).includes('private'));
+assert.equal(validateInput({room:'room',form,kind:'bad'}),null);assert.equal(validateInput({room:'room',form,history:{dates:Array(9).fill({})}}),null);
+assert.equal(validateInput({room:'room',form,history:{memories:[{title:'x'.repeat(81)}]}}),null);
+kind='ok';response=await handler(request({room:'room',form,kind:'date',history:context}));assert.equal(response.status,200);
+const proactive=JSON.parse(JSON.parse(calls.at(-1).options.body).contents[0].parts[0].text);assert.equal(proactive.kind,'date');assert(!JSON.stringify(proactive).includes('private'));
+console.log('PASS: date mode and bounded record context strip diary bodies and photos');

@@ -17,24 +17,16 @@ function tap(label){const tree=render();button(tree,label).props.onClick();retur
 function advanceText(value){let tree=render(),field=all(tree,x=>x.type==='input'||x.type==='textarea')[0];assert(field);field.props.onChange({target:{value}});tree=render();all(tree,x=>x.type==='form')[0].props.onSubmit({preventDefault(){}});return render();}
 function submitText(){const tree=render();return all(tree,x=>x.type==='form')[0].props.onSubmit({preventDefault(){}});}
 (async()=>{
-let tree=render(true);assert(text(tree).includes('오늘 메뉴, 같이 정해보자'));
-assert(button(tree,'질문하기').props.disabled);assert(!text(tree).includes('취향대로 골라줘'));tree=advanceText('오늘 저녁 추천해줘');await new Promise(r=>setImmediate(r));tree=render();assert(text(tree).includes('기본 메뉴에서 골라봤어'));assert.equal(all(tree,x=>x.type==='article').length,3);
-const first=all(tree,x=>x.type==='h3').map(text);tree=tap('다시 뽑기');await new Promise(r=>setImmediate(r));tree=render();assert.notDeepEqual(all(tree,x=>x.type==='h3').map(text).slice(-3),first);
-const saveButton=button(tree,'다음에 먹자');saveButton.props.onClick();saveButton.props.onClick();tree=render();assert.equal(data.buckets.length,0);assert.equal(data.foodWishes.length,1);assert(data.foodWishes[0].reason);assert(data.foodWishes[0].preparation);assert(text(tree).includes('먹고 싶은 메뉴에 저장했어요.'));assert(button(tree,'저장했어요').props.disabled);
-// Saved menus survive remounts, retain details, and completed menus can be saved again.
-tree=render(true);assert(text(tree).includes(data.foodWishes[0].name));assert(text(tree).includes(data.foodWishes[0].reason));assert(text(tree).includes(data.foodWishes[0].preparation));button(tree,'먹었어').props.onClick();tree=render();assert(data.foodWishes[0].done);assert.equal(all(tree,x=>x.type==='button'&&text(x)==='먹었어').length,0);assert(text(tree).includes('먹어본 메뉴'));
-
-tree=advanceText('해산물 국물 메뉴를 배달로 먹고 싶어');await new Promise(r=>setImmediate(r));tree=render();
-// AI requests preserve conditions, conversation preferences and previous menu avoidance.
+let tree=render(true);tree=render();assert(text(tree).includes('다음엔 우리, 이거 어때?'));assert.equal(all(tree,x=>x.type==='input').length,0);assert(text(tree).includes('기본 추천'));
+let save=button(tree,'다음에 먹자');save.props.onClick();save.props.onClick();assert.equal(data.foodWishes.length,1);tree=render();button(tree,'먹었어').props.onClick();assert(data.foodWishes[0].done);
+data.buckets.push({id:'b',text:'도자기 만들기',done:false});data.memories=[{title:'바다 여행',memo:'private diary',photos:['private photo']}];data.places=[{name:'공원',address:'private address'}];
+const history=F.history(data);assert.equal(history.memories[0].title,'바다 여행');assert(!JSON.stringify(history).includes('private'));assert(F.suggestions(data,'date',0).some(x=>x.name==='도자기 만들기'));
+let pending=button(render(),'데이트 코스').props.onClick();await pending;tree=render();assert(text(tree).includes('도자기 만들기'));assert(button(tree,'저장했어요').props.disabled);assert.equal(data.buckets.length,1,'existing wish is not duplicated');
 c.window.FUTARI_CONFIG.FOOD_AI_ENABLED=true;let called=0,lastBody,release;fetcher=async(url,options)=>{called++;lastBody=JSON.parse(options.body);return new Promise(resolve=>release=resolve);};
-tree=render();let pending=button(tree,'다시 뽑기').props.onClick();button(tree,'다시 뽑기').props.onClick();assert.equal(called,1);assert.equal(lastBody.form.mode,'meal');assert.equal(lastBody.form.note,'해산물 국물 메뉴를 배달로 먹고 싶어');assert(lastBody.avoid.length>0);assert(!('data' in lastBody));release(new Response(JSON.stringify({provider:'gemini',items:menus})));await pending;tree=render();assert(text(tree).includes('이 메뉴들은 어때?'));
-all(tree,x=>x.type==='input')[0].props.onChange({target:{value:'점심에 돼지고기 먹었어'}});tree=render();pending=all(tree,x=>x.type==='form')[0].props.onSubmit({preventDefault(){}});assert(lastBody.form.note.includes('점심에 돼지고기 먹었어'));release(new Response(JSON.stringify({provider:'gemini',items:menus})));await new Promise(r=>setImmediate(r));tree=render();assert(text(tree).includes('점심에 돼지고기 먹었어'));
-pending=button(tree,'덜 매운 거').props.onClick();assert.equal(lastBody.form.taste,'담백');assert(lastBody.form.note.includes('점심에 돼지고기 먹었어'));assert(lastBody.form.note.includes('덜 매운 거'));release(new Response(JSON.stringify({provider:'gemini',items:menus})));await pending;
-// Navigation cancels stale responses.
-pending=button(render(),'다시 뽑기').props.onClick();tap('처음부터 다시');release(new Response(JSON.stringify({provider:'gemini',items:menus})));await pending;tree=render();assert(!text(tree).includes('이 메뉴들은 어때?'));assert(text(tree).includes('AI에게 질문하기'));assert.equal(all(tree,x=>x.type==='input')[0].props.value,'');
-// Quota failures fall back once, retaining both request and source disclosure.
-fetcher=async()=>{called++;return new Response('{}',{status:429});};const before=called;advanceText('저녁 뭐 먹을까?');await new Promise(r=>setImmediate(r));tree=render();assert.equal(called,before+1);assert(text(tree).includes('잠시 쉬었다가'));assert(text(tree).includes('기본 메뉴에서 골라봤어'));assert(text(tree).includes('자유롭게 적은 추가 요청은 AI 연결 시 반영돼요'));
-// Arbitrary pairing questions are sent directly without choosing conditions.
-tap('처음부터 다시');fetcher=async(url,options)=>{lastBody=JSON.parse(options.body);return new Response(JSON.stringify({provider:'gemini',items:menus}));};advanceText('부야베스와 뇨키에 어울리는 메뉴 추천해줘');await new Promise(r=>setImmediate(r));assert.equal(lastBody.form.note,'부야베스와 뇨키에 어울리는 메뉴 추천해줘');
-console.log('PASS: menu filters, direct questions, conversation, request retention, save, duplicate guard, cancellation, quota fallback and arbitrary pairing');
+pending=button(render(),'먹거리 추천').props.onClick();button(render(),'먹거리 추천').props.onClick();assert.equal(called,1);assert.equal(lastBody.kind,'meal');assert.equal(lastBody.history.memories[0].title,'바다 여행');assert(!JSON.stringify(lastBody).includes('private'));release(new Response(JSON.stringify({provider:'gemini',items:menus})));await pending;tree=render();assert(text(tree).includes('AI가 우리 기록으로 골랐어요'));
+pending=button(tree,'데이트 코스').props.onClick();assert.equal(lastBody.kind,'date');release(new Response(JSON.stringify({provider:'gemini',items:menus})));await pending;tree=render();button(tree,'같이 해보자').props.onClick();assert(data.buckets.some(x=>x.text===menus[0].name&&x.preparation));
+fetcher=async()=>new Response('{}',{status:429});await button(render(),'다시 추천받기').props.onClick();tree=render();assert(text(tree).includes('추천 한도'));assert(text(tree).includes('기본 추천'));
+// Loading the page starts recommendations without a question or button click.
+let auto=0;fetcher=async()=>{auto++;return new Response(JSON.stringify({provider:'gemini',items:menus}));};render(true);await new Promise(r=>setImmediate(r));assert.equal(auto,1);assert(text(render()).includes('AI가 우리 기록으로 골랐어요'));
+console.log('PASS: proactive food/date recommendations, bounded history, no private bodies/photos, auto generation, saved wishes, duplicate guard, request lock and quota fallback');
 })().catch(error=>{console.error(error);process.exitCode=1;});

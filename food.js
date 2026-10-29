@@ -140,60 +140,61 @@
     list.push({id:'note',title:'마지막으로, 더 바라는 건?',hint:'예를 들면 “따뜻한 국물 하나랑 새콤한 안주도!”',input:true,optional:true});
     return list;
   }
+  // Only bounded titles and places are shared with the recommendation service.
+  function history(data){
+    var out={};['foodWishes','memories','places','buckets','dates'].forEach(function(key){
+      out[key]=(data[key]||[]).slice(-8).map(function(row){var item={};['name','title','text','place','category','date'].forEach(function(k){if(typeof row[k]==='string')item[k]=row[k].slice(0,80);});if(typeof row.done==='boolean')item.done=row.done;return item;});
+    });return out;
+  }
+  function suggestions(data,kind,turn){
+    if(kind==='meal'){
+      var eaten=(data.foodWishes||[]).filter(function(x){return x.done;}).map(function(x){return x.name;});
+      var wished=(data.foodWishes||[]).filter(function(x){return !x.done;}).slice(-3).map(function(x){return {name:x.name,reason:'둘이 먹고 싶다고 저장해 둔 메뉴예요.',preparation:x.preparation||'이번 식사 후보로 함께 골라봐요.'};});
+      var basic=recommend(Object.assign({},DEFAULT,{mode:'meal'}),turn).filter(function(x){return eaten.indexOf(x.name)<0&&!wished.some(function(w){return w.name===x.name;});});
+      return wished.concat(basic).slice(0,3);
+    }
+    var buckets=(data.buckets||[]).filter(function(x){return !x.done;});
+    var places=(data.places||[]).filter(function(x){return !x.done;});
+    var choices=buckets.map(function(x){return {name:x.text||x.title,reason:'함께 하고 싶은 일로 남겨 둔 기록을 골랐어요.',preparation:'가까운 곳에서 식사 → '+(x.text||x.title)+' → 산책 코스로 이어가 봐요.'};}).concat(places.map(function(x){return {name:x.name||x.title,reason:'저장한 장소를 중심으로 제안하는 코스예요.',preparation:(x.name||x.title)+' 방문 → 근처 식사 → 카페. 이동 거리와 영업시간은 방문 전에 확인해요.'};})).filter(function(x){return x.name;});
+    if(!choices.length)choices=[{name:'동네 산책과 식사',reason:'아직 데이트 기록이 부족해 가볍게 시작할 코스를 골랐어요.',preparation:'가까운 공원 산책 → 식사 → 카페'},{name:'전시와 카페',reason:'함께 새 취향을 발견할 수 있는 기본 코스예요.',preparation:'관심 있는 전시 → 카페 → 저녁 식사. 전시 일정은 확인해요.'},{name:'집에서 보내는 데이트',reason:'편하게 함께 시간을 보낼 수 있는 기본 코스예요.',preparation:'장보기 → 함께 요리 → 영화 한 편'}];
+    var start=(turn||0)%choices.length;return choices.slice(start).concat(choices.slice(0,start)).slice(0,3);
+  }
   function Planner(props){
-    var fs=R.useState(Object.assign({},DEFAULT,{mode:'meal'})),form=fs[0],setForm=fs[1];
-    var vs=R.useState('start'),view=vs[0],setView=vs[1],rs=R.useState(null),result=rs[0],setResult=rs[1];
+    var ks=R.useState('meal'),kind=ks[0],setKind=ks[1],rs=R.useState(null),result=rs[0],setResult=rs[1];
     var bs=R.useState(false),busy=bs[0],setBusy=bs[1],es=R.useState(''),error=es[0],setError=es[1];
-    var cs=R.useState([]),chat=cs[0],setChat=cs[1],ds=R.useState(''),draft=ds[0],setDraft=ds[1],ps=R.useState(''),picked=ps[0],setPicked=ps[1];
-    var request=R.useRef({id:0,controller:null,alive:true,locked:false,history:[],turn:Math.floor(Math.random()*94)}),bottom=R.useRef(null);
-    var config=window.FUTARI_CONFIG||{},url=endpoint(config);
-    R.useEffect(function(){request.current.alive=true;return function(){request.current.alive=false;request.current.id++;if(request.current.controller)request.current.controller.abort();};},[]);
-    R.useEffect(function(){if(bottom.current&&bottom.current.scrollIntoView)bottom.current.scrollIntoView({block:'nearest'});},[chat.length,busy]);
-    function cancel(){request.current.id++;request.current.locked=false;if(request.current.controller)request.current.controller.abort();setBusy(false);}
-    function restart(){cancel();setView('start');setResult(null);setChat([]);setDraft('');setError('');setPicked('');request.current.history=[];setForm(Object.assign({},DEFAULT,{mode:'meal'}));}
-    function save(item){props.update(function(d){d.foodWishes=d.foodWishes||[];if(!d.foodWishes.some(function(b){return b.name===item.name&&!b.done;}))d.foodWishes.push({id:window.FutariActivity.id(),name:item.name,reason:item.reason,preparation:item.preparation,done:false});});setPicked(item.name);}
-    async function generate(next,message){
+    var request=R.useRef({id:0,controller:null,alive:true,turn:0,locked:false}),config=window.FUTARI_CONFIG||{};
+    var context=history(props.data),contextKey=JSON.stringify(context);
+    R.useEffect(function(){request.current.alive=true;generate('meal');return function(){request.current.alive=false;request.current.locked=false;request.current.id++;if(request.current.controller)request.current.controller.abort();};},[props.room]);
+    async function generate(nextKind){
       if(request.current.locked)return;
-      request.current.locked=true;var id=++request.current.id,controller=new AbortController();request.current.controller=controller;
-      setView('result');setBusy(true);setError('');setPicked('');setDraft('');
-      var messages=chat.concat([{role:'user',text:message}]);setChat(messages);
-      var avoid=Array.from(new Set(request.current.history.concat(result?result.items.map(function(v){return v.name;}):[]))).slice(-12);
+      request.current.locked=true;setKind(nextKind);setBusy(true);setError('');
+      var id=++request.current.id,controller=new AbortController();request.current.controller=controller;
+      var turn=request.current.turn++,local=suggestions(props.data,nextKind,turn),url=endpoint(config);
+      setResult({kind:nextKind,items:local,source:'basic',contextKey:contextKey});
       var timer=setTimeout(function(){controller.abort();},25000);
       try{
-        var items,source='basic';
-        if(url&&props.room){
-          var response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json',apikey:config.SUPABASE_KEY},body:JSON.stringify({room:props.room,form:next,avoid:avoid}),signal:controller.signal});
-          if(!response.ok)throw Error(response.status===429?'잠시 쉬었다가 다시 물어봐요. 지금은 기본 메뉴에서 골랐어요.':'AI 답변을 받지 못해서 기본 메뉴에서 골랐어요.');
-          var data=await response.json();if(data.provider!=='gemini'||!validResults(data.items))throw Error('AI 답변을 받지 못해서 기본 메뉴에서 골랐어요.');
-          items=data.items;source='Gemini';
-        }else items=recommend(next,request.current.turn++);
-        if(request.current.alive&&id===request.current.id)complete(items,source);
-      }catch(e){if(request.current.alive&&id===request.current.id){setError(e.name==='AbortError'?'답변이 늦어져서 기본 메뉴에서 골랐어요.':e.message);complete(recommend(next,request.current.turn++),'basic');}}
+        if(!url||!props.room)return;
+        var form=Object.assign({},DEFAULT,{mode:'meal'});
+        var response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json',apikey:config.SUPABASE_KEY},body:JSON.stringify({room:props.room,form:form,kind:nextKind,history:context,avoid:[]}),signal:controller.signal});
+        if(!response.ok)throw Error(response.status===429?'추천 한도에 도달해 기본 추천을 보여드려요.':'AI 연결이 어려워 기본 추천을 보여드려요.');
+        var data=await response.json();if(data.provider!=='gemini'||!validResults(data.items))throw Error('AI 응답을 확인하지 못해 기본 추천을 보여드려요.');
+        if(request.current.alive&&id===request.current.id)setResult({kind:nextKind,items:data.items,source:'Gemini',contextKey:contextKey});
+      }catch(e){if(request.current.alive&&id===request.current.id)setError(e.name==='AbortError'?'AI 응답이 늦어 기본 추천을 보여드려요.':e.message);}
       finally{clearTimeout(timer);if(id===request.current.id){request.current.locked=false;request.current.controller=null;if(request.current.alive)setBusy(false);}}
-      function complete(items,source){request.current.history=avoid.concat(items.map(function(v){return v.name;})).slice(-12);setResult({source:source,items:items});setChat(messages.concat([{role:'assistant',source:source,items:items}]));}
     }
-    function refine(text){text=text.trim();if(!text||busy)return;
-      // Keep the existing bounded API contract; retain recent requests as context.
-      var note=text==='다시 뽑기'?form.note:(form.note?form.note+'\n추가 요청: '+text:text).slice(-400),next=Object.assign({},form,{note:note});
-      if(text==='좀 가볍게')next.taste='가벼운 메뉴';if(text==='덜 매운 거')next.taste='담백';if(text==='매운 거')next.taste='매콤';
-      setForm(next);return generate(next,text);
-    }
-    function finish(id){props.update(function(d){var item=(d.foodWishes||[]).find(function(v){return v.id===id;});if(item)item.done=true;});}
-    return h('section',{className:'card food-planner','aria-label':'함께 고르는 음식'},
-      h('span',{className:'eyebrow'},'오늘 뭐 먹을까?'),
-      view==='start'?h('div',null,h('h2',{className:'food-question-title'},'오늘 메뉴, 같이 정해보자'),h('p',{className:'muted'},'먹고 싶은 메뉴나 궁금한 걸 AI에게 바로 물어봐.'),
-        h('form',{className:'food-chat-form',onSubmit:function(e){e.preventDefault();return refine(draft);}},h('label',{htmlFor:'food-question-input'},'AI에게 질문하기'),h('div',null,h('input',{id:'food-question-input',value:draft,maxLength:240,placeholder:'예: 삼겹살이랑 같이 먹을 메뉴 추천해줘',onChange:function(e){setDraft(e.target.value);}}),h('button',{type:'submit',className:'btn',disabled:busy||!draft.trim()},'질문하기')))):null,
-      view==='result'?h('div',{className:'food-conversation'},
-        h('div',{className:'food-result-nav'},h('button',{type:'button',className:'food-back',onClick:restart},'처음부터 다시')),
-        h('div',{className:'food-messages','aria-live':'polite'},chat.map(function(msg,i){return h('div',{key:i,className:'food-message food-message-'+msg.role},msg.role==='user'?h('p',null,msg.text):h('div',{className:'food-results'},h('p',{className:'eyebrow'},msg.source==='Gemini'?'이 메뉴들은 어때?':'기본 메뉴에서 골라봤어'),msg.items.length?msg.items.map(function(item){var saved=(props.data.foodWishes||[]).some(function(b){return b.name===item.name&&!b.done;});return h('article',{key:item.name},h('h3',null,item.name),h('p',null,item.reason),h('small',null,item.preparation),h('button',{type:'button',className:'btn ghost sm',disabled:saved||busy,onClick:function(){save(item);}},saved?'저장했어요':'다음에 먹자'));}):h('p',null,'조건에 맞는 기본 메뉴가 없어요. 조건을 조금 바꿔볼까요?')));}),busy?h('p',{role:'status',className:'muted'},'어울리는 메뉴를 생각하고 있어요…'):null,h('div',{ref:bottom})),
-        error?h('p',{className:'food-error',role:'alert'},error):null,
-        picked?h('p',{role:'status'},picked+' · 먹고 싶은 메뉴에 저장했어요.'):null,
-        !busy&&result?h('div',{className:'food-chips'},['다시 뽑기','좀 가볍게','덜 매운 거','매운 거'].map(function(label){return h('button',{type:'button',key:label,className:'btn ghost sm',onClick:function(){return refine(label);}},label);})):null,
-        h('form',{className:'food-chat-form',onSubmit:function(e){e.preventDefault();refine(draft);}},h('label',{htmlFor:'food-chat-input'},'먹고 싶은 걸 편하게 말해줘'),h('div',null,h('input',{id:'food-chat-input',value:draft,maxLength:240,disabled:busy,placeholder:'예: 점심에 돼지고기 먹었어',onChange:function(e){setDraft(e.target.value);}}),h('button',{type:'submit',className:'btn',disabled:busy||!draft.trim()},'보내기'))),
-        result&&result.source==='basic'?h('p',{className:'muted food-help'},'지금은 기본 메뉴 추천이에요. 자유롭게 적은 추가 요청은 AI 연결 시 반영돼요.'):null):null,
-      h('section',{className:'food-saved','aria-label':'먹고 싶은 메뉴'},h('h2',null,'먹고 싶은 메뉴'),h('p',{className:'muted'},'다음에 같이 먹고 싶은 메뉴를 모아둬요.'),
-        h('div',{className:'food-results'},(props.data.foodWishes||[]).filter(function(item){return !item.done;}).length?(props.data.foodWishes||[]).filter(function(item){return !item.done;}).map(function(item){return h('article',{key:item.id},h('h3',null,item.name),h('p',null,item.reason),h('small',null,item.preparation),h('button',{type:'button',className:'btn ghost sm',onClick:function(){finish(item.id);}},'먹었어'));}):h('p',{className:'muted'},'추천에서 마음에 드는 메뉴에 ‘다음에 먹자’를 눌러봐요.')),
-        (props.data.foodWishes||[]).some(function(item){return item.done;})?h('details',null,h('summary',null,'먹어본 메뉴'),h('div',{className:'food-results'},(props.data.foodWishes||[]).filter(function(item){return item.done;}).map(function(item){return h('article',{key:item.id},h('h3',null,item.name),h('p',null,item.reason),h('small',null,item.preparation));}))):null));
+    function save(item){props.update(function(d){var key=kind==='meal'?'foodWishes':'buckets';d[key]=d[key]||[];if(!d[key].some(function(x){return (x.name||x.text)===item.name&&!x.done;}))d[key].push(Object.assign({id:window.FutariActivity.id(),done:false,reason:item.reason,preparation:item.preparation},kind==='meal'?{name:item.name}:{text:item.name,category:'경험'}));});}
+    return h('section',{className:'card food-planner','aria-label':'우리 기록으로 추천'},
+      h('span',{className:'eyebrow'},'우리 기록으로 추천'),h('h2',{className:'food-question-title'},'다음엔 우리, 이거 어때?'),
+      h('p',{className:'muted'},'먹거리와 추억, 저장한 장소와 하고 싶은 일을 바탕으로 먼저 골라봤어요. 최근 기록의 제목과 장소만 AI 추천에 사용해요.'),
+      h('div',{className:'food-chips'},['meal','date'].map(function(k){return h('button',{type:'button',key:k,className:'btn'+(kind===k?'':' ghost'),disabled:busy,'aria-pressed':kind===k,onClick:function(){return generate(k);}},k==='meal'?'먹거리 추천':'데이트 코스');})),
+      busy?h('p',{role:'status'},'우리 기록을 보고 추천하는 중…'):null,
+      error?h('p',{className:'food-error',role:'status'},error):null,
+      result?h('div',null,h('p',{className:'eyebrow'},result.source==='Gemini'?'AI가 우리 기록으로 골랐어요':'기본 추천 · 저장한 후보가 있으면 먼저 보여드려요'),
+        result.contextKey!==contextKey?h('p',{className:'muted'},'새 기록이 있어요. 다시 추천받으면 반영돼요.'):null,
+        h('div',{className:'food-results'},result.items.map(function(item){var saved=(props.data[kind==='meal'?'foodWishes':'buckets']||[]).some(function(x){return (x.name||x.text)===item.name&&!x.done;});return h('article',{key:item.name},h('h3',null,item.name),h('p',null,item.reason),h('small',null,item.preparation),h('button',{type:'button',className:'btn ghost sm',disabled:saved||busy,onClick:function(){save(item);}},saved?'저장했어요':kind==='meal'?'다음에 먹자':'같이 해보자'));}))):null,
+      h('button',{type:'button',className:'btn ghost',disabled:busy,onClick:function(){return generate(kind);}},'다시 추천받기'),
+      h('section',{className:'food-saved'},h('h2',null,'먹고 싶은 메뉴'),h('div',{className:'food-results'},(props.data.foodWishes||[]).filter(function(x){return !x.done;}).map(function(item){return h('article',{key:item.id},h('h3',null,item.name),h('p',null,item.reason),h('small',null,item.preparation),h('button',{type:'button',className:'btn ghost sm',onClick:function(){props.update(function(d){var row=d.foodWishes.find(function(x){return x.id===item.id;});if(row)row.done=true;});}},'먹었어'));}))),
+      h('details',null,h('summary',null,'먹어본 메뉴'),(props.data.foodWishes||[]).filter(function(x){return x.done;}).map(function(x){return h('p',{key:x.id},x.name);}))) ;
   }
-  window.FutariFood={Planner:Planner,questions:questions,recommend:recommend,validResults:validResults,endpoint:endpoint};
+  window.FutariFood={Planner:Planner,history:history,suggestions:suggestions,questions:questions,recommend:recommend,validResults:validResults,endpoint:endpoint};
 })();
