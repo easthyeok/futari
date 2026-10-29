@@ -59,3 +59,15 @@ body.journal-mode{background:linear-gradient(155deg,#f5f0e5,#fcf8f0 65%,#f0ecdf)
 .food-conversation button:disabled{cursor:default;opacity:.6}
 
 .food-saved{margin-top:28px;padding-top:22px;border-top:1px solid #e7d8c8}.food-saved h2{font-size:20px;color:#60422e}.food-saved summary{padding:12px 0;cursor:pointer;color:#705744}.food-saved>p{font-size:14px;line-height:1.7}
+
+/* Local food picker: readable combinations and a compact full menu browser. */
+.food-picks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.food-picks article{margin:0;min-width:0;padding:12px}
+.food-picks h3{overflow-wrap:anywhere;font-size:17px}
+.food-picks .btn{width:100%;min-height:44px}
+.food-recent{display:flex;align-items:center;gap:8px;margin-top:14px}
+.food-recent input[type=checkbox]{width:20px;height:20px;flex:0 0 20px;margin:0;padding:0}
+.food-catalog{max-height:60vh;overflow-y:auto;overscroll-behavior:contain;padding:2px}
+.food-planner details{margin-top:18px}
+.food-planner summary{cursor:pointer;padding:10px 0;line-height:1.5}
+@media(max-width:340px){.food-picks{grid-template-columns:1fr}}
