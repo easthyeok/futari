@@ -53,5 +53,7 @@
   });if(window.FutariHome&&window.FutariHome.balance(d)<0)conflict(['공동 지갑','잔액 부족']);return d;
  }
  function replay(remote,outbox){var d=copy(remote);outbox.forEach(function(tx){if(!(d.commits||{})[tx.id])d=apply(d,tx.ops);});return d;}
- window.FutariData={VERSION:VERSION,migrate:migrate,backup:backup,merge:merge,reconcile:reconcile,copy:copy,same:same,diff:diff,apply:apply,replay:replay};
+ // Wire patches intentionally omit before-values, which may contain large photos.
+ function patch(base,next){return diff(base,next).map(function(op){var out={path:op.path};if(op.removed)out.removed=true;else out.value=op.value;return out;});}
+ window.FutariData={VERSION:VERSION,migrate:migrate,backup:backup,merge:merge,reconcile:reconcile,copy:copy,same:same,diff:diff,patch:patch,apply:apply,replay:replay};
 })();

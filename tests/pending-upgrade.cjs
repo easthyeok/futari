@@ -1,0 +1,12 @@
+const fs=require('fs'),vm=require('vm'),path=require('path'),assert=require('assert/strict');
+const raw=JSON.stringify({pending:true,data:{memories:[{id:'m',photo:'large-original'}]},base:{memories:[]},version:'v1',outbox:[{id:'tx',ops:[]}]});
+const local=new Map([['futari_cache_room',raw]]),snapshots=new Map();let fail=false,badRead=false;
+const storage={getItem:k=>local.get(k)||null,setItem(){throw Error('local storage full');}};
+const db={close(){},transaction(name,mode){let staged;const tx={error:Error('backup failed'),objectStore(){return{put(v){staged=v;},get(k){return{result:badRead?undefined:snapshots.get(k)};}};}};queueMicrotask(()=>{if(fail&&mode==='readwrite')tx.onabort();else{if(staged)snapshots.set(staged.key,staged);tx.oncomplete();}});return tx;}};
+const c={window:{indexedDB:{open(){const r={result:db};queueMicrotask(()=>r.onsuccess());return r;}}}};
+vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../preservation.js'),'utf8'),c);
+(async()=>{const p=c.window.FutariPreservation;assert(await p.backupPending(storage,'room'));const saved=[...snapshots.values()][0];assert.equal(saved.raw,raw);assert.equal(saved.reason,'before-pending-shell-update');assert.equal(local.get('futari_cache_room'),raw);
+ fail=true;await assert.rejects(p.backupPending(storage,'room'),/backup failed/);assert.equal(local.get('futari_cache_room'),raw);fail=false;badRead=true;await assert.rejects(p.backupPending(storage,'room'),/확인/);assert.equal(local.get('futari_cache_room'),raw);
+ local.set('futari_cache_room',JSON.stringify({pending:true}));await assert.rejects(p.backupPending(storage,'room'),/원본/);local.set('futari_cache_room',JSON.stringify({pending:false,data:{}}));assert.equal(await p.backupPending(storage,'room'),false);
+ console.log('PASS: independent IndexedDB backup despite full localStorage, read-back verification, failed/invalid backup blocks upgrade, original pending cache never changed');
+})().catch(e=>{console.error(e);process.exitCode=1;});

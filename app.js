@@ -110,12 +110,16 @@
     });
   }
 
-  function cloudCommit(code,data,version){
+  function cloudCommit(code,data,version,base){
     var client=getSupabase();if(!client)return Promise.reject(new Error('Supabase 미설정'));
-    var stamp=new Date().toISOString().replace('Z',String(Math.floor(Math.random()*1000)).padStart(3,'0')+'Z');
-    var q=client.from('rooms').update({data:data,updated_at:stamp}).eq('code',code);
-    q=version==null?q.is('updated_at',null):q.eq('updated_at',version);
-    return q.select('updated_at').then(function(res){if(res.error)throw res.error;if(!res.data||!res.data.length){var e=Error('저장 버전 변경');e.cas=true;throw e;}roomVersions[code]=res.data[0].updated_at;return{version:res.data[0].updated_at};});
+    if(!base||!window.FutariData)return Promise.reject(new Error('먼저 서버 기준 데이터를 확인해주세요. 미저장 변경은 보관됩니다.'));
+    var patches=window.FutariData.patch(base,data);
+    return client.rpc('commit_room_patch',{room_code:code,expected_version:version==null?null:version,patches:patches}).then(function(res){
+      if(res.error){if(res.error.code==='57014')throw new Error('서버 저장 시간이 초과됐어요. 변경은 기기에 보관되어 있어요.');throw res.error;}
+      if(!res.data||res.data.conflict){var e=Error('저장 버전 변경');e.cas=true;throw e;}
+      if(!Object.prototype.hasOwnProperty.call(res.data,'version'))throw new Error('서버 저장 응답을 확인하지 못했어요. 변경은 기기에 보관되어 있어요.');
+      roomVersions[code]=res.data.version;return{version:res.data.version};
+    });
   }
   /* ===== 날짜 ===== */
   function todayStr() { return localDate(new Date()); }
@@ -640,7 +644,7 @@
     useEffect(function(){
       if(!room)return;
       var cached=cachedRoom(room);try{if(cached&&cached.data)checkedRoom(cached.data,room+'_local');}catch(e){setSyncMsg('마이그레이션 중단 · '+e.message);setLoading(false);return;}
-      var session=new window.FutariSync.Session({room:room,cached:cachedRoom(room),load:function(){return cloudLoad(room).then(function(d){return{data:d,version:roomVersions[room]};});},save:function(d,v){return cloudCommit(room,d,v);},persist:function(snapshot){return window.FutariPreservation.persist(localStorage,room,snapshot);},onChange:function(d,ack,message,pending){if(d)setData(d);if(ack)setConfirmed(ack);dirty.current=pending;setSyncMsg(message);setLoading(false);}});
+      var session=new window.FutariSync.Session({room:room,cached:cachedRoom(room),load:function(){var version;return cloudLoad(room,function(v){version=v;return true;}).then(function(d){return{data:d,version:version};});},save:function(d,v,b){return cloudCommit(room,d,v,b);},persist:function(snapshot){return window.FutariPreservation.persist(localStorage,room,snapshot);},onChange:function(d,ack,message,pending){if(d)setData(d);if(ack)setConfirmed(ack);dirty.current=pending;setSyncMsg(message);setLoading(false);}});
       sessionRef.current=session;session.open();
       var client=getSupabase(),channel=null;
       function refresh(){if(document.visibilityState!=='hidden')session.refresh();}

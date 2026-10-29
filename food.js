@@ -397,64 +397,42 @@
     }
     state.previous=picked.map(function(x){return x.name;});return picked;
   }
-  var DATE_COURSES=[
-    {name:'공원 산책과 카페',description:'걷다가 마음에 드는 카페에 쉬어 가요. 서로 사진도 한 장씩 찍어주기.',steps:['공원 산책','카페에서 쉬기','오늘 사진 남기기']},
-    {name:'전시 보고 취향 나누기',description:'각자 제일 좋았던 작품 하나씩 골라봐요. 카페에서 고른 이유도 이야기하고요.',steps:['관심 있는 전시 관람','좋았던 작품 고르기','카페에서 이야기하기']},
-    {name:'도자기 공방 데이트',description:'서로 쓸 컵이나 작은 접시를 만들어줘요. 손으로 만드는 재미를 같이 느껴봐요.',steps:['공방 체험','완성작 사진 남기기','근처 산책']},
-    {name:'서점에서 서로 책 골라주기',description:'상대가 좋아할 책 한 권씩 골라주고, 마음에 든 문장을 같이 읽어봐요.',steps:['서점 구경','서로 책 골라주기','카페에서 책 읽기']},
-    {name:'영화와 짧은 산책',description:'같이 고른 영화 한 편 보고, 좋았던 장면을 이야기하며 걸어요.',steps:['영화 관람','간단한 식사','산책하며 감상 나누기']},
-    {name:'집에서 보드게임 한 판',description:'간식 놓고 둘이 한 판! 진 사람은 다음 판 간식 가져오기 어때요?',steps:['간식 고르기','보드게임 한 판','한 판 더 또는 영화 보기']},
-    {name:'피크닉과 사진',description:'돗자리랑 간단한 먹거리 챙겨서 가볍게 나가요. 날씨는 출발 전에 확인해요.',steps:['피크닉 먹거리 고르기','공원에서 쉬기','서로 사진 찍어주기']},
-    {name:'시장 구경과 간식',description:'처음 보는 간식을 하나씩 골라 반씩 나눠 먹어요. 마음에 드는 것도 기록해두고요.',steps:['시장 구경','간식 하나씩 고르기','주변 산책']},
-    {name:'볼링 한 판',description:'점수 낮아도 괜찮아요. 서로 하이파이브하면서 가볍게 승부해봐요.',steps:['볼링 한 판','간단한 식사','카페에서 쉬기']},
-    {name:'사진 찍으며 동네 탐험',description:'예쁜 간판, 고양이, 재미있는 풍경. 같은 동네에서 각자 다른 장면을 찾아봐요.',steps:['처음 걷는 골목 탐험','주제 정해 사진 찍기','사진 같이 고르기']},
-    {name:'함께 그리는 하루',description:'서로 얼굴을 그리거나 같은 풍경을 각자 그려봐요. 잘 그리는 건 중요하지 않죠.',steps:['그릴 주제 고르기','함께 그림 그리기','그림 교환하고 날짜 남기기']},
-    {name:'야경 산책',description:'해 질 무렵 가볍게 나가서 저녁 풍경을 같이 봐요. 편한 신발로 천천히 걷기.',steps:['저녁 식사','노을 또는 야경 보기','따뜻한 음료 마시기']}
-  ];
-  function datePool(data){
-    var seen=new Set(),saved=[];
-    (data.buckets||[]).filter(function(x){return !x.done&&x.category!=='맛집';}).forEach(function(x){if(!x.text)return;var name=x.text.trim();if(seen.has(normalize(name)))return;seen.add(normalize(name));saved.push({name:name,description:x.description||x.reason||'함께 하고 싶다고 저장해 둔 일이에요. 오늘 하나 골라 같이 해볼까요?',steps:Array.isArray(x.steps)&&x.steps.length?x.steps:[name,'근처 카페에서 쉬기','오늘 기록 남기기']});});
-    (data.places||[]).filter(function(x){return !x.done&&x.category!=='맛집';}).forEach(function(x){var name=x.name||x.title;if(!name||seen.has(normalize(name)))return;seen.add(normalize(name));saved.push({name:name,description:'둘이 저장한 장소예요. 방문 시간과 이동 경로를 확인하고 가볍게 다녀와요.',steps:[name+' 방문','주변 산책','카페에서 쉬기']});});
-    return saved.concat(DATE_COURSES.filter(function(x){return !seen.has(normalize(x.name));}));
-  }
   function Planner(props){
-    var data=props.data,ks=R.useState('meal'),kind=ks[0],setKind=ks[1];
+    var data=props.data;
     var fs=R.useState({category:'전체',query:'',skipRecent:true}),filter=fs[0],setFilter=fs[1];
-    var deck=R.useRef({meal:{},date:{}}),rs=R.useState({scope:'',items:[]}),result=rs[0],setResult=rs[1];
+    var deck=R.useRef({}),rs=R.useState({scope:'',items:[]}),result=rs[0],setResult=rs[1];
     var ns=R.useState(''),name=ns[0],setName=ns[1],ds=R.useState(''),description=ds[0],setDescription=ds[1],ms=R.useState(''),message=ms[0],setMessage=ms[1];
-    var pool=kind==='meal'?foodPool(data,filter):datePool(data),poolKey=JSON.stringify(pool.map(function(x){return x.name;}));
-    var scope=JSON.stringify([props.room||'',kind,poolKey]),items=result.scope===scope?result.items:[];
+    var pool=foodPool(data,filter),poolKey=JSON.stringify(pool.map(function(x){return x.name;}));
+    var scope=JSON.stringify([props.room||'',poolKey]),items=result.scope===scope?result.items:[];
+    R.useEffect(function(){setMessage('');setName('');setDescription('');},[props.room]);
     // Refresh only when the available candidates change, including room switches.
-    R.useEffect(function(){setResult({scope:scope,items:draw(pool,deck.current[kind],6)});},[props.room,kind,poolKey]);
+    R.useEffect(function(){setResult({scope:scope,items:draw(pool,deck.current,6)});},[props.room,poolKey]);
     function updateFilter(patch){setFilter(Object.assign({},filter,patch));setMessage('');}
-    function pick(){setResult({scope:scope,items:draw(pool,deck.current[kind],6)});setMessage('');}
-    function changeKind(value){setKind(value);setMessage('');}
-    function isSaved(item){return (data[kind==='meal'?'foodWishes':'buckets']||[]).some(function(x){return !x.done&&normalize(x.name||x.text)===normalize(item.name);});}
-    function save(item){props.update(function(d){var key=kind==='meal'?'foodWishes':'buckets';d[key]=d[key]||[];if(d[key].some(function(x){return !x.done&&normalize(x.name||x.text)===normalize(item.name);}))return;d[key].push(Object.assign({id:window.FutariActivity.id(),done:false,description:item.description},kind==='meal'?{name:item.name}:{text:item.name,category:'경험',steps:item.steps}));});setMessage(item.name+' · '+(kind==='meal'?'먹고 싶은 메뉴':'버킷리스트')+'에 저장했어요.');}
+    function pick(){setResult({scope:scope,items:draw(pool,deck.current,6)});setMessage('');}
+    function isSaved(item){return (data.foodWishes||[]).some(function(x){return !x.done&&normalize(x.name||x.text)===normalize(item.name);});}
+    function save(item){props.update(function(d){d.foodWishes=d.foodWishes||[];if(d.foodWishes.some(function(x){return !x.done&&normalize(x.name)===normalize(item.name);}))return;d.foodWishes.push({id:window.FutariActivity.id(),done:false,name:item.name,description:item.description});});setMessage(item.name+' · 먹고 싶은 메뉴에 저장했어요.');}
     function addCustom(e){e.preventDefault();var value=name.trim();if(!value)return;save({name:value,description:description.trim()||'둘이 직접 골라 저장한 메뉴예요. 오늘 같이 먹어볼까요?'});setName('');setDescription('');}
     function finish(id){props.update(function(d){var row=(d.foodWishes||[]).find(function(x){return x.id===id;});if(row){row.done=true;row.eatenAt=new Date().toISOString();}});}
     function foodDescription(item){var match=MENUS.find(function(x){return normalize(x.name)===normalize(item.name);});return item.description||(match&&match.description)||item.reason||'둘이 골라 둔 메뉴, 오늘 같이 먹어볼까요?';}
     var categories=['전체'].concat(CATEGORIES);if(catalog(data).some(function(x){return x.category==='우리 메뉴';}))categories.push('우리 메뉴');
-    return h('section',{className:'card food-planner','aria-label':'음식과 데이트 고르기'},
-      h('span',{className:'eyebrow'},'오늘은 우리 뭐 할까?'),h('h2',{className:'food-question-title'},kind==='meal'?'오늘 뭐 먹을까?':'오늘 어디 갈까?'),
-      h('div',{className:'food-chips'},[['meal','음식 추천'],['date','데이트 코스']].map(function(v){return h('button',{type:'button',key:v[0],className:'btn'+(kind===v[0]?'':' ghost'),'aria-pressed':kind===v[0],onClick:function(){changeKind(v[0]);}},v[1]);})),
-      kind==='meal'?h('div',null,
+    return h('section',{className:'card food-planner','aria-label':'음식 고르기'},
+      h('span',{className:'eyebrow'},'둘이 고르는 메뉴'),h('h2',{className:'food-question-title'},'오늘 뭐 먹을까?'),
+      h('div',null,
         h('p',{className:'muted'},catalog(data).length+'가지 메뉴에서 골라봐요. 마음에 드는 조합은 다음에 같이 먹어요.'),
         h('label',null,'음식 종류',h('select',{value:filter.category,onChange:function(e){updateFilter({category:e.target.value});}},categories.map(function(c){return h('option',{key:c,value:c},c);}))),
         h('label',null,'메뉴 검색',h('input',{type:'search',value:filter.query,placeholder:'떡볶이, 치즈, 얼큰한 국물…',onChange:function(e){updateFilter({query:e.target.value});}})),
         h('label',{className:'food-recent'},h('input',{type:'checkbox',checked:filter.skipRecent,onChange:function(e){updateFilter({skipRecent:e.target.checked});}}),'최근 먹은 메뉴 빼기'),
-        h('p',{className:'muted food-help'},'‘먹었어’로 표시한 최근 12개를 빼요. 지금 고를 수 있는 메뉴 '+pool.length+'개.')):
-        h('p',{className:'muted'},'저장한 하고 싶은 일·장소와 기본 코스를 섞어서 골라봐요.'),
-      h('div',{className:'food-results food-picks','aria-live':'polite'},items.length?items.map(function(item){return h('article',{key:item.name},h('h3',null,item.name),h('p',null,item.description),kind==='date'?h('ol',null,(item.steps||[]).map(function(step,i){return h('li',{key:i},step);})):null,h('button',{type:'button',className:'btn ghost sm',disabled:isSaved(item),onClick:function(){save(item);}},isSaved(item)?'저장했어요':kind==='meal'?'다음에 먹자':'같이 해보자'));}):h('p',{className:'muted'},'조건에 맞는 메뉴가 없어요. 검색어나 음식 종류를 바꾸거나 최근 먹은 메뉴도 포함해보세요.')),
-      h('button',{type:'button',className:'btn block',disabled:!pool.length,onClick:pick},kind==='meal'?'다른 메뉴 보기':'다른 코스 보기'),
+        h('p',{className:'muted food-help'},'‘먹었어’로 표시한 최근 12개를 빼요. 지금 고를 수 있는 메뉴 '+pool.length+'개.')),
+      h('div',{className:'food-results food-picks','aria-live':'polite'},items.length?items.map(function(item){return h('article',{key:item.name},h('h3',null,item.name),h('p',null,item.description),h('button',{type:'button',className:'btn ghost sm',disabled:isSaved(item),onClick:function(){save(item);}},isSaved(item)?'저장했어요':'다음에 먹자'));}):h('p',{className:'muted'},'조건에 맞는 메뉴가 없어요. 검색어나 음식 종류를 바꾸거나 최근 먹은 메뉴도 포함해보세요.')),
+      h('button',{type:'button',className:'btn block',disabled:!pool.length,onClick:pick},'다른 메뉴 보기'),
       message?h('p',{role:'status'},message):null,
-      kind==='meal'?h('div',null,
+      h('div',null,
         h('details',null,h('summary',null,'전체 메뉴 보기 · '+pool.length+'개'),h('div',{className:'food-results food-catalog'},pool.map(function(item){return h('article',{key:item.name},h('h3',null,item.name),h('p',null,item.description),h('button',{type:'button',className:'btn ghost sm',disabled:isSaved(item),onClick:function(){save(item);}},isSaved(item)?'저장했어요':'다음에 먹자'));}))),
         h('details',null,h('summary',null,'우리 메뉴 직접 추가'),h('form',{className:'food-chat-form',onSubmit:addCustom},
           h('label',null,'음식 이름',h('input',{value:name,maxLength:80,placeholder:'예: 우리 스타일 로제떡볶이',onChange:function(e){setName(e.target.value);}})),
           h('label',null,'먹고 싶은 조합',h('input',{value:description,maxLength:240,placeholder:'예: 당면이랑 치즈 듬뿍 넣어서 먹자!',onChange:function(e){setDescription(e.target.value);}})),h('button',{type:'submit',className:'btn',disabled:!name.trim()},'메뉴 저장'))),
         h('section',{className:'food-saved'},h('h2',null,'먹고 싶은 메뉴'),h('div',{className:'food-results'},(data.foodWishes||[]).filter(function(x){return !x.done;}).length?(data.foodWishes||[]).filter(function(x){return !x.done;}).map(function(item){return h('article',{key:item.id},h('h3',null,item.name),h('p',null,foodDescription(item)),h('button',{type:'button',className:'btn ghost sm',onClick:function(){finish(item.id);}},'먹었어'));}):h('p',{className:'muted'},'마음에 드는 메뉴에서 ‘다음에 먹자’를 눌러봐요.'))),
-        h('details',null,h('summary',null,'먹어본 메뉴'),(data.foodWishes||[]).filter(function(x){return x.done;}).map(function(x){return h('p',{key:x.id},x.name);}))) :null);
+        h('details',null,h('summary',null,'먹어본 메뉴'),(data.foodWishes||[]).filter(function(x){return x.done;}).map(function(x){return h('p',{key:x.id},x.name);}))) );
   }
-  window.FutariFood={Planner:Planner,menus:MENUS,categories:CATEGORIES,catalog:catalog,foodPool:foodPool,draw:draw,datePool:datePool};
+  window.FutariFood={Planner:Planner,menus:MENUS,categories:CATEGORIES,catalog:catalog,foodPool:foodPool,draw:draw};
 })();

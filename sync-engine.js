@@ -15,7 +15,7 @@
  Session.prototype.schedule=function(){var self=this;clearTimeout(this.timer);this.timer=setTimeout(function(){self.flush();},250);};
  Session.prototype.flush=async function(){if(this.running||this.closed||this.fatal||!this.dirty)return;this.running=true;this.conflictVersion=undefined;clearTimeout(this.timer);var snapshot=D.copy(this.data),base=D.copy(this.base||{}),committed=false;
   try{if(!this.base)throw Error('먼저 서버 기준 데이터를 확인해주세요. 미저장 변경은 보관됩니다.');for(var attempt=0;attempt<5;attempt++){
-   try{var result=await this.o.save(snapshot,this.version);if(this.closed)return;this.version=result.version;this.failures=0;this.retryAt=0;committed=true;break;}
+   try{var result=await this.o.save(snapshot,this.version,base);if(this.closed)return;this.version=result.version;this.failures=0;this.retryAt=0;committed=true;break;}
    catch(e){if(!e.cas)throw e;var remote=await this.o.load();if(this.closed)return;var pendingSnapshot=this.outbox.filter(function(tx){return(snapshot.commits||{})[tx.id];});var merged=this.outbox.length?D.replay(remote.data,pendingSnapshot):D.reconcile(base,snapshot,remote.data),working=this.outbox.length?D.replay(remote.data,this.outbox):D.reconcile(base,this.data,remote.data);snapshot=merged;this.data=working;this.base=this.confirmed=remote.data;this.version=remote.version;base=D.copy(remote.data);this.emit('서로의 변경을 합치는 중…');}
   }
   if(!committed)throw Error('변경이 많아 저장을 잠시 기다립니다. 다시 시도해주세요.');

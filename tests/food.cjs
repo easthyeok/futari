@@ -37,10 +37,9 @@ all(tree,x=>x.type==='input'&&x.props.type==='search')[0].props.onChange({target
 all(tree,x=>x.type==='input'&&x.props.type==='search')[0].props.onChange({target:{value:'no-such-food'}});tree=screen();assert(text(tree).includes('조건에 맞는 메뉴가 없어요'));assert(button(tree,'다른 메뉴 보기').props.disabled);
 // Custom names and combinations persist with saved wishes and enter future draws.
 let fields=all(tree,x=>x.type==='input'&&!x.props.type);fields[0].props.onChange({target:{value:'우리 로제떡볶이'}});tree=screen();fields=all(tree,x=>x.type==='input'&&!x.props.type);fields[1].props.onChange({target:{value:'당면 두 배에 치즈 듬뿍!'}});tree=screen();all(tree,x=>x.type==='form')[0].props.onSubmit({preventDefault(){}});assert(data.foodWishes.some(x=>x.name==='우리 로제떡볶이'&&x.description==='당면 두 배에 치즈 듬뿍!'));assert.equal(F.catalog(data).length,365);
-// Date screen remains local and never shows the saved food list.
-data.buckets.push({id:'date',text:'도자기 만들기',category:'경험',done:false});tree=screen();button(tree,'데이트 코스').props.onClick();tree=screen();assert(!text(tree).includes('먹고 싶은 메뉴'));assert(all(recommendations(tree),x=>x.type==='ol').length>0);assert(F.datePool(data).some(x=>x.name==='도자기 만들기'));
-const course=all(recommendations(tree),x=>x.type==='article').find(x=>all(x,y=>y.type==='button'&&text(y)==='같이 해보자').length);if(course){button(course,'같이 해보자').props.onClick();assert(data.buckets.some(x=>Array.isArray(x.steps)));}
+// Food picker exposes no date recommendations and does not modify existing date wishes.
+data.buckets.push({id:'date',text:'도자기 만들기',category:'경험',done:false});tree=screen();assert(!text(tree).includes('데이트 코스'));assert(!text(tree).includes('다른 코스'));assert(!F.datePool);assert.equal(data.buckets.length,1);
 // Switching rooms never leaves the previous room's food candidates visible.
 props={...props,room:'other',data:{foodWishes:[{id:'custom',name:'다른 방 메뉴',description:'다른 방에서만 볼 메뉴',done:false}],buckets:[]},update(){}};tree=screen();assert(!text(tree).includes('우리 로제떡볶이'));
 assert.equal(network,0,'recommendations never call external services, even with stale AI config');
-console.log('PASS: 364 unique described menus, 14 categories, exhaustive shuffle, search, recent exclusions, custom combinations, duplicate-safe saves, local date courses, room isolation and zero AI calls');
+console.log('PASS: 364 unique described menus, 14 categories, exhaustive shuffle, search, recent exclusions, custom combinations, duplicate-safe saves, date recommendation removal, room isolation and zero AI calls');
