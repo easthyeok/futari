@@ -84,9 +84,20 @@
 
   function checkedRoom(raw,code){try{if(window.FutariData)window.FutariData.backup(localStorage,code,raw);return normalizeData(raw);}catch(e){e.migration=true;throw e;}}
   // 방 데이터 불러오기 (없으면 새로 만듦)
-  function cloudLoad(code, acceptVersion) {
+  function cloudLoad(code, acceptVersion, known) {
     var client = getSupabase();
     if (!client) return Promise.reject(new Error('Supabase 미설정'));
+    // Probe only the version: the confirmed snapshot excludes unsaved local edits.
+    if (known && known.data && known.version != null) {
+      return client.from('rooms').select('updated_at').eq('code', code).maybeSingle().then(function (res) {
+        if (res.error) throw res.error;
+        if (res.data && res.data.updated_at === known.version) {
+          if (!acceptVersion || acceptVersion(known.version)) roomVersions[code] = known.version;
+          return known.data;
+        }
+        return cloudLoad(code, acceptVersion);
+      });
+    }
     return client.from('rooms').select('data,updated_at').eq('code', code).maybeSingle().then(function (res) {
       if (res.error) throw res.error;
       if (res.data && res.data.data) { var normalized=checkedRoom(res.data.data,code); if (!acceptVersion || acceptVersion(res.data.updated_at)) roomVersions[code] = res.data.updated_at; return normalized; }
@@ -634,6 +645,7 @@
     var tabState = useState('home'), tab = tabState[0], setTab = tabState[1];
     var loadingState = useState(!!getRoomCode() && !cachedRoom(getRoomCode())), loading = loadingState[0], setLoading = loadingState[1];
     var syncState = useState(''), syncMsg = syncState[0], setSyncMsg = syncState[1];
+    var connectionState=useState(''),connectionMsg=connectionState[0],setConnectionMsg=connectionState[1];
     var sessionRef=useRef(null),confirmedState=useState(null),confirmed=confirmedState[0],setConfirmed=confirmedState[1];
     var dirty=useRef(!!(cachedRoom(getRoomCode())||{}).pending),revision=useRef(0),skipSave=useRef(true);
     var notificationState=useState(false),notifications=notificationState[0],setNotifications=notificationState[1];
@@ -644,15 +656,13 @@
     useEffect(function(){
       if(!room)return;
       var cached=cachedRoom(room);try{if(cached&&cached.data)checkedRoom(cached.data,room+'_local');}catch(e){setSyncMsg('마이그레이션 중단 · '+e.message);setLoading(false);return;}
-      var session=new window.FutariSync.Session({room:room,cached:cachedRoom(room),load:function(){var version;return cloudLoad(room,function(v){version=v;return true;}).then(function(d){return{data:d,version:version};});},save:function(d,v,b){return cloudCommit(room,d,v,b);},persist:function(snapshot){return window.FutariPreservation.persist(localStorage,room,snapshot);},onChange:function(d,ack,message,pending){if(d)setData(d);if(ack)setConfirmed(ack);dirty.current=pending;setSyncMsg(message);setLoading(false);}});
+      var session=new window.FutariSync.Session({room:room,cached:cachedRoom(room),load:function(){var version;return cloudLoad(room,function(v){version=v;return true;},session&&session.base?{data:session.base,version:session.version}:null).then(function(d){return{data:d,version:version};});},save:function(d,v,b){return cloudCommit(room,d,v,b);},persist:function(snapshot){return window.FutariPreservation.persist(localStorage,room,snapshot);},onChange:function(d,ack,message,pending){if(d)setData(d);if(ack)setConfirmed(ack);dirty.current=pending;setSyncMsg(message);setLoading(false);}});
       sessionRef.current=session;session.open();
-      var client=getSupabase(),channel=null;
-      function refresh(){if(document.visibilityState!=='hidden')session.refresh();}
-      if(client&&client.channel){channel=client.channel('futari-'+room).on('postgres_changes',{event:'*',schema:'public',table:'rooms',filter:'code=eq.'+room},refresh).subscribe(function(status){if(status==='SUBSCRIBED')refresh();});}
+      setConnectionMsg('');
+      var stopWatching=window.FutariSync.watch(session,getSupabase(),room,setConnectionMsg);
       function due(){if(!session.data||!window.FutariContent)return;var list=window.FutariContent.due(session.data,currentIdentity(),Date.now());if(list.length)session.change(function(d){var known=new Set(d.activities.map(function(e){return e.id;}));list.forEach(function(e){if(!known.has(e.id))d.activities.push(e);});},null);}
       var reminderTimer=setInterval(due,30000);
-      var poll=setInterval(refresh,5000);window.addEventListener('online',refresh);window.addEventListener('focus',refresh);document.addEventListener('visibilitychange',refresh);
-      return function(){session.close();if(sessionRef.current===session)sessionRef.current=null;clearInterval(poll);clearInterval(reminderTimer);if(channel)client.removeChannel(channel);window.removeEventListener('online',refresh);window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);};
+      return function(){stopWatching();session.close();if(sessionRef.current===session)sessionRef.current=null;clearInterval(reminderTimer);};
     },[room]);
     function update(mutator){if(sessionRef.current&&sessionRef.current.o.room===room)sessionRef.current.change(mutator,currentIdentity());}
     function retrySave(){if(sessionRef.current)sessionRef.current.flush();}
@@ -689,6 +699,7 @@
     var current = tab === 'settings' ? { comp: SettingsPage } : tab==='mail'?{comp:window.FutariContent.Mailbox}:tab==='catalog'?{comp:window.FutariContent.Catalog}:TABS.find(function(t){return t.id===tab;})||TABS[0];
 
     return h('div', { className: 'app' + (tab === 'games' ? ' game-app' : '') },
+      connectionMsg ? h('div', { className: 'card', role: 'status' }, connectionMsg) : null,
       syncMsg && !/^(연결됨|다시 연결됨|저장됨|동기화됨) ✓$/.test(syncMsg) ? h('button', { type: 'button', onClick: function () { if (syncMsg.indexOf('저장 실패') === 0) retrySave(); }, style: { border: 0, cursor: 'pointer', position: 'fixed', top: 8, left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,.65)', color: '#fff', padding: '4px 12px', borderRadius: 999, fontSize: 12, zIndex: 3000 } }, syncMsg) : null,
       h('div',{className:'app-toolbar'},h('span',null,data.settings[member]+'의 공간'),h('div',{className:'toolbar-actions'},h('button',{className:'toolbar-icon','aria-label':'우편함',onClick:function(){navigate('mail');}},'✉'),h('button',{className:'toolbar-icon','aria-label':'기록 달력',onClick:function(){navigate('together');}},'▦'),h('button',{className:'toolbar-icon','aria-label':'알림 '+unread.length+'개',onClick:function(){setNotifications(!notifications);setShowSummary(false);}},h('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:1.8,'aria-hidden':true},h('path',{d:'M 5 17h14l-2-3V9a5 5 0 0 0-10 0v5l-2 3z M 10 20h4 M 12 2v2'})),unread.length?h('span',{className:'notification-count'},unread.length>99?'99+':unread.length):null),h('button',{className:'btn ghost sm',onClick:function(){setTab(tab==='settings'?'home':'settings');}},'⚙'))),
       showSummary&&unread.length?h('div',{className:'activity-summary',role:'status'},h('button',{onClick:function(){setNotifications(true);setShowSummary(false);}},'새 소식 '+unread.length+'개 · 상대의 하루를 확인해요'),h('button',{'aria-label':'새 소식 요약 닫기',onClick:function(){setShowSummary(false);}},'×')):null,
