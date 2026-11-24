@@ -41,21 +41,36 @@
   function index(date){return Math.floor(Date.parse(date+'T00:00:00Z')/86400000);}
   function options(type,date){if(type==='moment'||type==='imagine')return topic(type,date).slice(1);return (type==='travel'?TRAVEL:FOOD)[index(date)%3];}
   function question(date){return QUESTIONS[index(date)%QUESTIONS.length];}
+  var QUICK=[
+    ['지금 더 끌리는 건?','☕ 커피','🍵 차'],['오늘은 어떤 쪽?','🏠 집에서 쉬기','🚶 가볍게 나가기'],
+    ['하나만 고른다면?','🍞 빵','🍚 밥'],['오늘 듣고 싶은 음악은?','🌿 잔잔한 곡','🎵 신나는 곡'],
+    ['지금 보고 싶은 풍경은?','🌊 바다','🌲 숲'],['간식 하나 고르기','🍫 초콜릿','🍦 아이스크림'],
+    ['오늘의 날씨를 고른다면?','☀️ 햇살','🌙 달빛'],['둘이 쉬는 시간에는?','🎬 영화 보기','💬 수다 떨기'],
+    ['지금 더 좋은 건?','🫂 꼭 안기','🤝 손잡기'],['다음에 만나면?','🍽 맛있는 것 먹기','🚶 함께 걷기']
+  ];
+  function quickQuestion(date){return QUICK[index(date)%QUICK.length];}
+  function choiceHistory(data,who){return Object.keys(data.together||{}).filter(function(day){return /^\d{4}-\d{2}-\d{2}$/.test(day);}).sort().reverse().map(function(day){
+    var e=data.together[day]||{},items=[];
+    ['moment','imagine','travel','food'].forEach(function(kind){var v=e[kind]||{},choices=options(kind,day),mine=v[who],other=who==='me'?'you':'me';if(mine===undefined&&v[other]===undefined)return;var q=(kind==='moment'||kind==='imagine')?topic(kind,day)[0]:(kind==='travel'?'같이 떠난다면?':'오늘 먹고 싶은 건?');items.push({key:kind,title:q,me:choices[v.me],you:choices[v.you],visible:mine!==undefined});});
+    var q=e.quick||{},myQuick=q[who],otherQuick=q[who==='me'?'you':'me'];if(myQuick||otherQuick)items.push({key:'quick',title:(myQuick||otherQuick).prompt,me:q.me&&q.me.choice,you:q.you&&q.you.choice,visible:!!myQuick});
+    var n=e.notes||{},other=who==='me'?'you':'me';if(n[who]||n[other])items.push({key:'notes',title:question(day),me:n.me,you:n.you,visible:!!n[who]});
+    return {date:day,items:items};
+  }).filter(function(row){return row.items.length;});}
   function ChoiceCard(props){var d=props.data,date=props.date,type=props.kind,who=props.member,e=(d.together||{})[date]||{},values=e[type]||{},both=values.me!==undefined&&values.you!==undefined,items=options(type,date);
     return h('section',{className:'today-choice card choice-'+type},h('span',{className:'eyebrow'},type==='moment'?'A LITTLE DISCOVERY':'JUST IMAGINE'),h('h2',{className:'title-lg'},(type==='moment'||type==='imagine')?topic(type,date)[0]:(type==='travel'?'같이 떠난다면?':'오늘 먹고 싶은 건?')),h('p',{className:'muted'},'정답은 없어요. 오늘의 너와 가장 가까운 선택은?'),h('div',{className:'today-options'},items.map(function(label,i){return h('button',{key:label,className:values[who]===i?'selected':'',disabled:both,'aria-pressed':values[who]===i,onClick:function(){props.update(function(d){window.FutariHome.act(d,date,who,type,i);});}},label);})),
       both?h('div',{className:'today-reveal','aria-live':'polite'},h('strong',null,values.me===values.you?'통했어요! 같은 마음 💛':'다른 취향도 알아가는 중 💛'),h('p',null,d.settings.me+' · '+items[values.me],h('br'),d.settings.you+' · '+items[values.you])):h('p',{className:'today-wait','aria-live':'polite'},values[who]!==undefined?'선택했어요. 상대도 고르면 둘의 취향이 열려요.':'하나를 골라봐요. 둘 다 고르면 서로의 선택이 열려요.'));
   }
   function TodayPage(props){
     var home=window.FutariHome,d=props.data,who=props.member,other=who==='me'?'you':'me',date=home.day(),e=(d.together||{})[date]||{},moods=e.moods||{},reactions=e.reactions||{},notes=e.notes||{},activity=e.activity||{},both=!!(notes.me&&notes.you);
-    var state=React.useState(notes[who]||''),draft=state[0],setDraft=state[1];
+    var quick=quickQuestion(date),quickValues=e.quick||{},history=choiceHistory(d,who);
     function act(type,value){props.update(function(d){home.act(d,date,who,type,value);});}
     return h('div',{className:'today-page'},h('header',{className:'today-heading'},h('p',{className:'eyebrow'},'FUTARI · A LITTLE CLOSER EVERY DAY'),h('h1',{className:'title-xl'},'오늘 우리'),h('p',{className:'muted'},date.replace(/-/g,'.')+' · 작은 선택으로 서로를 알아가요.')),
       h('section',{className:'card today-mood'},h('span',{className:'eyebrow'},'HOW ARE YOU TODAY?'),h('h2',{className:'title-lg'},'오늘의 나는'),h('div',{className:'mood-grid'},['🥰','😊','😐','😴','😢'].map(function(m,i){return h('button',{key:m,className:'mood'+(moods[who]===m?' on':''),'aria-label':['사랑 가득','기분 좋아','평범해','피곤해','속상해'][i],'aria-pressed':moods[who]===m,onClick:function(){act('moods',m);}},m);})),h('div',{className:'partner-status'},moods[other]?d.settings[other]+'의 오늘 '+moods[other]:'상대의 오늘 기분을 기다리고 있어요.'),moods[other]?h('button',{className:'btn ghost block',disabled:!!reactions[who],onClick:function(){act('reactions','🫶');}},reactions[who]?'마음을 보냈어요 🫶':'마음 보내기 🫶'):null,reactions[other]?h('p',{className:'muted'},d.settings[other]+'님이 마음을 보냈어요 🫶'):null),
       h(ChoiceCard,Object.assign({},props,{date:date,kind:'moment'})),h(ChoiceCard,Object.assign({},props,{date:date,kind:'imagine'})),
-      h('section',{className:'card today-question'},h('span',{className:'eyebrow'},'A QUESTION FOR US · '+(index(date)%QUESTIONS.length+1)),h('h2',{className:'title-lg'},'오늘의 질문카드'),h('blockquote',null,question(date)),h('label',{htmlFor:'today-answer'},d.settings[who]+'의 답변'),h('textarea',{id:'today-answer',value:draft,maxLength:300,rows:3,placeholder:'길지 않아도 좋아요. 오늘의 생각을 남겨주세요.',onChange:function(ev){setDraft(ev.target.value);}}),h('div',{className:'today-answer-footer'},h('small',null,draft.length+' / 300'),h('button',{className:'btn sm',disabled:!draft.trim()||draft.trim()===notes[who],onClick:function(){act('notes',draft.trim());}},notes[who]?'답변 수정':'답변 남기기')),
-        both?h('div',{className:'today-reveal','aria-live':'polite'},['me','you'].map(function(w){return h('div',{key:w},h('strong',null,d.settings[w]+'의 답변'),h('p',{className:'answer-text'},notes[w]));})):h('p',{className:'today-wait','aria-live':'polite'},notes[who]?'답변을 저장했어요. 상대도 답하면 함께 열려요.':'둘 다 답하면 서로의 답변을 볼 수 있어요.')),
+      h('section',{className:'card today-question'},h('span',{className:'eyebrow'},'A LITTLE PICK'),h('h2',{className:'title-lg'},'가볍게 하나만'),h('p',{className:'muted'},quick[0]),h('div',{className:'today-options'},quick.slice(1).map(function(label){return h('button',{key:label,className:quickValues[who]&&quickValues[who].choice===label?'selected':'','aria-pressed':!!(quickValues[who]&&quickValues[who].choice===label),onClick:function(){props.update(function(next){if(!next.together)next.together={};if(!next.together[date])next.together[date]={};if(!next.together[date].quick)next.together[date].quick={};next.together[date].quick[who]={prompt:quick[0],choice:label};});}},label);})),quickValues[who]&&quickValues[other]?h('div',{className:'today-reveal'},d.settings.me+' · '+quickValues.me.choice,h('br'),d.settings.you+' · '+quickValues.you.choice):h('p',{className:'today-wait'},quickValues[who]?'선택을 남겼어요. 상대도 고르면 함께 보여요.':'마음 가는 쪽을 눌러주세요.')),
+      h('section',{className:'card today-history'},h('h2',{className:'title-lg'},'우리의 선택 기록'),h('p',{className:'muted'},'그날의 작은 선택을 다시 볼 수 있어요.'),history.length?history.map(function(row){return h('details',{key:row.date},h('summary',null,row.date.replace(/-/g,'.')+' · '+row.items.length+'가지 기록'),row.items.map(function(item){return h('div',{key:item.key,className:'today-reveal'},h('strong',null,item.title),h('p',null,d.settings[who]+' · '+(item[who]===undefined?'아직 선택하지 않았어요':item[who])),h('p',null,d.settings[other]+' · '+(!item.visible?'내가 고르면 볼 수 있어요':item[other]===undefined?'아직 선택하지 않았어요':item[other]))); }));}):h('p',{className:'today-wait'},'선택을 남기면 여기에 차곡차곡 쌓여요.')),
       h('section',{className:'card'},h('h2',{className:'title-lg'},'🌿 오늘 함께한 작은 시간'),h('p',{className:'muted'},'함께 산책했거나 잠깐이라도 같이 쉬었나요? 오늘의 작은 시간을 기록해요.'),h('button',{className:'btn block',disabled:!!activity[who],onClick:function(){act('activity',true);}},activity[who]?activity[other]?'함께한 시간을 남겼어요 ✓':'상대의 확인을 기다려요 ✓':'함께했어요')),
       h('p',{className:'today-outro'},'어제와 다른 오늘의 너를, 조금씩 알아가는 시간.'));
   }
-  window.FutariToday={TodayPage:TodayPage,ChoiceCard:ChoiceCard,options:options,topic:topic,question:question};
+  window.FutariToday={TodayPage:TodayPage,ChoiceCard:ChoiceCard,options:options,topic:topic,question:question,quickQuestion:quickQuestion,choiceHistory:choiceHistory};
 })();
