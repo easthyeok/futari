@@ -272,9 +272,22 @@ body.game-mode #root { max-width:820px; }
 .today-reveal { background:#f4efe5; border-radius:14px; padding:15px; font-size:12px; color:#856d54; line-height:1.8; margin-top:14px; }
 .today-reveal p { margin:8px 0 0; }
 .today-reveal>div+div { padding-top:12px; margin-top:12px; border-top:1px solid #dfd4c6; }
-.today-history details { border-top:1px solid #eee4db; padding:14px 0; }
-.today-history summary { cursor:pointer; color:#765e4d; font-size:13px; font-weight:600; }
-.today-history .today-reveal { margin-top:10px; }
+.choice-memory-list { display:grid; gap:14px; margin-top:18px; }
+.choice-memory { overflow:hidden; border:1px solid #eaded2; border-radius:18px; background:#fffbf7; }
+.choice-memory-date { display:flex; justify-content:space-between; gap:12px; align-items:center; background:#f5e8de; padding:11px 14px; color:#876d5b; }
+.choice-memory-date span { font-size:9px; letter-spacing:.1em; font-weight:700; }
+.choice-memory-date time { font-size:12px; font-weight:700; }
+.choice-memory-item { padding:14px; }
+.choice-memory-item+.choice-memory-item { border-top:1px solid #f0e8e0; }
+.choice-memory-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; color:#6f5849; font-size:13px; line-height:1.5; }
+.choice-memory-match { flex-shrink:0; color:#aa715e; font-size:10px; }
+.choice-memory-pair { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:10px; }
+.choice-memory-person { min-width:0; padding:10px; border-radius:12px; background:#f7f0e9; }
+.choice-memory-person:nth-child(2) { background:#eef2eb; }
+.choice-memory-person small { display:block; color:#a28c7e; font-size:10px; margin-bottom:4px; }
+.choice-memory-value { display:block; color:#705c50; font-size:12px; line-height:1.5; white-space:pre-wrap; overflow-wrap:anywhere; }
+.choice-memory-older summary { cursor:pointer; padding:12px; text-align:center; color:#876d5b; font-size:12px; }
+.choice-memory-older .choice-memory { margin-top:14px; }
 .today-question { background:#fffdf6; }
 .today-question blockquote { margin:22px 0; padding:16px; background:#f4eddf; border-left:3px solid #cfb185; border-radius:0 12px 12px 0; color:#7b654d; font-size:18px; line-height:1.6; font-weight:600; word-break:keep-all; }
 .today-question label { display:block; margin-bottom:8px; font-size:12px; }
