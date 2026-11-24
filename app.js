@@ -657,6 +657,7 @@
     var loadingState = useState(!!getRoomCode() && !cachedRoom(getRoomCode())), loading = loadingState[0], setLoading = loadingState[1];
     var syncState = useState(''), syncMsg = syncState[0], setSyncMsg = syncState[1];
     var connectionState=useState(''),connectionMsg=connectionState[0],setConnectionMsg=connectionState[1];
+    var restartState=useState(0),restartSync=restartState[0],setRestartSync=restartState[1];
     var sessionRef=useRef(null),confirmedState=useState(null),confirmed=confirmedState[0],setConfirmed=confirmedState[1];
     var dirty=useRef(!!(cachedRoom(getRoomCode())||{}).pending),revision=useRef(0),skipSave=useRef(true);
     var notificationState=useState(false),notifications=notificationState[0],setNotifications=notificationState[1];
@@ -674,14 +675,19 @@
       function due(){if(!session.data||!window.FutariContent)return;var list=window.FutariContent.due(session.data,currentIdentity(),Date.now());if(list.length)session.change(function(d){var known=new Set(d.activities.map(function(e){return e.id;}));list.forEach(function(e){if(!known.has(e.id))d.activities.push(e);});},null);}
       var reminderTimer=setInterval(due,30000);
       return function(){stopWatching();session.close();if(sessionRef.current===session)sessionRef.current=null;clearInterval(reminderTimer);};
-    },[room]);
+    },[room,restartSync]);
     function update(mutator){if(sessionRef.current&&sessionRef.current.o.room===room)sessionRef.current.change(mutator,currentIdentity());}
     function retrySave(){if(sessionRef.current)sessionRef.current.flush();}
-    function recoverRemote(){
-      if(!confirm('미저장 변경을 백업하고 상대 변경을 불러올까요?'))return;
+    async function recoverRemote(){
+      if(!confirm('이 기기의 미저장 변경을 버리고 서버에 저장된 기록을 불러올까요?'))return;
       var session=sessionRef.current;if(!session)return;
-      try{localStorage.setItem('futari_conflict_backup_'+room,JSON.stringify({savedAt:new Date().toISOString(),data:session.data,base:session.base,outbox:session.outbox}));}catch(e){setSyncMsg('백업 실패 · 저장 공간을 확인해주세요');return;}
-      session.dirty=false;session.outbox=[];session.refresh();
+      session.close();setSyncMsg('서버 기록을 다시 불러오는 중…');
+      try{
+        var version,remote=await cloudLoad(room,function(v){version=v;return true;});
+        await window.FutariPreservation.persist(localStorage,room,{data:remote,base:remote,version:version,pending:false,outbox:[]});
+        dirty.current=false;setData(remote);setConfirmed(remote);setSyncMsg('연결됨 ✓');
+      }catch(e){setSyncMsg('연결 실패 · '+(e.message||'서버 기록을 불러오지 못했어요.'));}
+      setRestartSync(function(n){return n+1;});
     }
     function onEnter(code, loaded) { var kept=window.FutariPreservation.entry(localStorage,code,loaded,roomVersions[code]);dirty.current=!!kept.pending;setSyncMsg(kept.pending?'기기에 남은 미저장 변경을 보존했어요':'');setRoom(code);skipSave.current=true;setData(normalizeData(kept.data));setLoading(false);setConfirmed(null);setShowSummary(true); }
     function leaveRoom() {
@@ -714,7 +720,7 @@
       syncMsg && !/^(연결됨|다시 연결됨|저장됨|동기화됨) ✓$/.test(syncMsg) ? h('button', { type: 'button', onClick: function () { if (syncMsg.indexOf('저장 실패') === 0) retrySave(); }, style: { border: 0, cursor: 'pointer', position: 'fixed', top: 8, left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,.65)', color: '#fff', padding: '4px 12px', borderRadius: 999, fontSize: 12, zIndex: 3000 } }, syncMsg) : null,
       h('div',{className:'app-toolbar'},h('span',null,data.settings[member]+'의 공간'),h('div',{className:'toolbar-actions'},h('button',{className:'toolbar-icon','aria-label':'우편함',onClick:function(){navigate('mail');}},'✉'),h('button',{className:'toolbar-icon','aria-label':'기록 달력',onClick:function(){navigate('together');}},'▦'),h('button',{className:'toolbar-icon','aria-label':'알림 '+unread.length+'개',onClick:function(){setNotifications(!notifications);setShowSummary(false);}},h('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:1.8,'aria-hidden':true},h('path',{d:'M 5 17h14l-2-3V9a5 5 0 0 0-10 0v5l-2 3z M 10 20h4 M 12 2v2'})),unread.length?h('span',{className:'notification-count'},unread.length>99?'99+':unread.length):null),h('button',{className:'btn ghost sm',onClick:function(){setTab(tab==='settings'?'home':'settings');}},'⚙'))),
       showSummary&&unread.length?h('div',{className:'activity-summary',role:'status'},h('button',{onClick:function(){setNotifications(true);setShowSummary(false);}},'새 소식 '+unread.length+'개 · 상대의 하루를 확인해요'),h('button',{'aria-label':'새 소식 요약 닫기',onClick:function(){setShowSummary(false);}},'×')):null,
-      syncMsg.indexOf('저장 실패') === 0 || syncMsg.indexOf('연결 실패') === 0 ? h('div', { className: 'card', role: 'alert' }, h('p', { className: 'muted' }, '현재 화면의 변경은 이 기기에 보관되어 있어요. 필요한 내용을 설정에서 백업한 뒤 상대 변경을 불러올 수 있어요.'), h('button', { className: 'btn ghost block', onClick: recoverRemote }, '상대 변경 불러오기')) : null,
+      syncMsg.indexOf('저장 실패') === 0 || syncMsg.indexOf('연결 실패') === 0 ? h('div', { className: 'card', role: 'alert' }, h('p', { className: 'muted' }, '이 기기의 미저장 변경은 보관되어 있어요. 버려도 괜찮다면 서버 기록을 다시 불러올 수 있어요.'), h('button', { className: 'btn ghost block', onClick: recoverRemote }, '상대 변경 불러오기')) : null,
       notifications?h(window.FutariActivity.Center,pageProps):h(current.comp,pageProps),
       h('nav', { className: 'tabbar' }, TABS.map(function (t) {
         return h('button', { key: t.id, className: 'tab' + (tab === t.id ? ' active' : ''), onClick: function () { navigate(t.id); } },
