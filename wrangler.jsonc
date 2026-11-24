@@ -1,0 +1,19 @@
+{
+  "name": "futari-api",
+  "main": "cloudflare/worker.mjs",
+  "account_id": "ebdb07422c3a2d47e2b6ce84cbf0093f",
+  "compatibility_date": "2026-11-24",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "futari-db",
+      "database_id": "c241e4bc-e809-4bfd-9ac4-6ef429c2b6ba"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "PHOTOS",
+      "bucket_name": "futari-photos"
+    }
+  ]
+}

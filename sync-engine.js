@@ -36,10 +36,11 @@
    if(status==='SUBSCRIBED'){onStatus('');refresh();}
    else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED')onStatus('실시간 연결이 끊겼어요. 다시 연결되면 변경을 확인합니다.');
   });}
-  else onStatus('실시간 연결을 사용할 수 없어요. 앱으로 돌아오면 변경을 확인합니다.');
+  else onStatus('주기적으로 상대의 변경을 확인합니다.');
+  var poll=client?null:setInterval(refresh,5000);
   window.addEventListener('online',refresh);window.addEventListener('offline',offline);window.addEventListener('focus',refresh);document.addEventListener('visibilitychange',refresh);
   if(window.navigator&&window.navigator.onLine===false)offline();
-  return function(){stopped=true;clearTimeout(timer);if(channel)client.removeChannel(channel);window.removeEventListener('online',refresh);window.removeEventListener('offline',offline);window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);};
+  return function(){stopped=true;clearTimeout(timer);if(poll)clearInterval(poll);if(channel)client.removeChannel(channel);window.removeEventListener('online',refresh);window.removeEventListener('offline',offline);window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);};
  }
  Session.prototype.close=function(){this.closed=true;clearTimeout(this.timer);};
  window.FutariSync={Session:Session,watch:watch};

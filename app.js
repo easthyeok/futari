@@ -83,8 +83,18 @@
   }
 
   function checkedRoom(raw,code){try{if(window.FutariData)window.FutariData.backup(localStorage,code,raw);return normalizeData(raw);}catch(e){e.migration=true;throw e;}}
+  function cloudflareUrl(){return window.FUTARI_CONFIG&&window.FUTARI_CONFIG.CLOUDFLARE_API_URL;}
+  async function cfRequest(path,code,options){
+    options=options||{};options.headers=Object.assign({'X-Room-Code':encodeURIComponent(code)},options.headers||{});
+    var res=await fetch(cloudflareUrl().replace(/\/$/,'')+path,options),body=await res.json();
+    if(!res.ok){var e=Error(body.error||'공유 저장소 연결 실패');if(res.status===409)e.cas=true;throw e;}return body;
+  }
   // 방 데이터 불러오기 (없으면 새로 만듦)
   function cloudLoad(code, acceptVersion, known) {
+    if(cloudflareUrl())return cfRequest('/room'+(known&&known.version?'?version='+encodeURIComponent(known.version):''),code).then(function(r){
+      var data=r.unchanged&&known?known.data:checkedRoom(r.data,code);
+      if(!acceptVersion||acceptVersion(r.version))roomVersions[code]=r.version;return data;
+    });
     var client = getSupabase();
     if (!client) return Promise.reject(new Error('Supabase 미설정'));
     // Probe only the version: the confirmed snapshot excludes unsaved local edits.
@@ -122,6 +132,7 @@
   }
 
   function cloudCommit(code,data,version,base){
+    if(cloudflareUrl())return cfRequest('/room',code,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:data,version:version})}).then(function(r){roomVersions[code]=r.version;return{version:r.version};});
     var client=getSupabase();if(!client)return Promise.reject(new Error('Supabase 미설정'));
     if(!base||!window.FutariData)return Promise.reject(new Error('먼저 서버 기준 데이터를 확인해주세요. 미저장 변경은 보관됩니다.'));
     var patches=window.FutariData.patch(base,data);
@@ -659,7 +670,7 @@
       var session=new window.FutariSync.Session({room:room,cached:cachedRoom(room),load:function(){var version;return cloudLoad(room,function(v){version=v;return true;},session&&session.base?{data:session.base,version:session.version}:null).then(function(d){return{data:d,version:version};});},save:function(d,v,b){return cloudCommit(room,d,v,b);},persist:function(snapshot){return window.FutariPreservation.persist(localStorage,room,snapshot);},onChange:function(d,ack,message,pending){if(d)setData(d);if(ack)setConfirmed(ack);dirty.current=pending;setSyncMsg(message);setLoading(false);}});
       sessionRef.current=session;session.open();
       setConnectionMsg('');
-      var stopWatching=window.FutariSync.watch(session,getSupabase(),room,setConnectionMsg);
+      var stopWatching=window.FutariSync.watch(session,cloudflareUrl()?null:getSupabase(),room,setConnectionMsg);
       function due(){if(!session.data||!window.FutariContent)return;var list=window.FutariContent.due(session.data,currentIdentity(),Date.now());if(list.length)session.change(function(d){var known=new Set(d.activities.map(function(e){return e.id;}));list.forEach(function(e){if(!known.has(e.id))d.activities.push(e);});},null);}
       var reminderTimer=setInterval(due,30000);
       return function(){stopWatching();session.close();if(sessionRef.current===session)sessionRef.current=null;clearInterval(reminderTimer);};

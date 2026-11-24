@@ -12,3 +12,5 @@ Thumbs.db
 !.env.example
 supabase/.temp/
 supabase/.branches/
+.wrangler/
+.futari-room-code*
